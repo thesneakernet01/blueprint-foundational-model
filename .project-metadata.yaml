@@ -1,0 +1,86 @@
+# Cloudera AI / CML Applied ML Prototype (AMP) project metadata.
+# Spec: https://docs.cloudera.com/machine-learning/1.5.4/applied-ml-prototypes/topics/ml-amp-project-spec.html
+#
+# Deploys two applications in one project:
+#   1. tfm-api  — the FastAPI backend (app.py) that runs the NVIDIA TFM stack on a GPU
+#   2. tfm-ui   — the standalone React SPA (frontend/dist) that calls the API
+#
+# The backend binds CDSW_APP_PORT on 127.0.0.1 automatically (see tfm_demo/config.py).
+# Artifact export is triggered from the UI (POST /api/export) and runs on the GPU.
+
+name: Transaction Foundation Model — Live Fraud Inference
+description: >
+  Live fraud-inference demo for the NVIDIA Transaction Foundation Model blueprint.
+  A transaction flows through the GPU tokenizer, the decoder foundation model
+  (512-d last-token embedding), PCA-64, and three XGBoost heads (raw / embeddings
+  / combined) to produce fraud probabilities, AUC/AP lift, and a live UMAP
+  position. The FastAPI backend runs the NVIDIA stack on a GPU; the React SPA is
+  a pure client. Training/export of the artifacts is launched from the UI and
+  runs on the backend. Boots in a clearly-labelled DEMO-FALLBACK mode when the
+  checkpoint, artifacts, or GPU are unavailable.
+author: Mike Schuler
+specification_version: "1.0"
+prototype_version: "1.0"
+date: "2026-06-08"
+
+# Extra shared memory helps the GPU data loaders / RAPIDS.
+shared_memory_limit: 1
+
+environment_variables:
+  CORS_ORIGINS:
+    default: "*"
+    description: >
+      Comma-separated CORS allowlist for the API. Leave as "*" for the demo, or
+      set it to the tfm-ui application URL to lock the API down.
+    required: false
+  VITE_API_BASE:
+    default: ""
+    description: >
+      Full URL of the deployed tfm-api application (e.g.
+      https://tfm-api.<your-cml-domain>). The React SPA bakes this in at BUILD
+      time, so set it before running `npm run build` in frontend/.
+    required: false
+
+# Recommended runtime. REAL mode needs CUDA + RAPIDS (cudf/cuml) + torch, so a
+# GPU runtime that contains the NVIDIA TFM stack (e.g. the NeMo container
+# registered as a custom ML Runtime) is required for live inference; the stock
+# Nvidia GPU edition below is the closest catalog default.
+runtimes:
+  - editor: JupyterLab
+    kernel: Python 3.10
+    edition: Nvidia GPU
+
+tasks:
+  # --- one-time setup: add the web layer on top of the runtime ---------------
+  - type: run_session
+    name: Install demo dependencies
+    script: scripts/install_deps.py
+    kernel: Python 3.10
+    cpu: 2
+    memory: 4
+
+  # --- GPU backend: runs the NVIDIA TFM inference + export -------------------
+  - type: start_application
+    name: TFM Fraud API
+    subdomain: tfm-api
+    static_subdomain: true
+    script: app.py
+    kernel: Python 3.10
+    cpu: 2
+    memory: 16
+    gpu: 1
+    # The SPA calls this cross-origin without a CML session cookie, so the API
+    # endpoint must be reachable unauthenticated (demo). Pair with CORS_ORIGINS.
+    bypass_authentication: true
+    environment_variables:
+      CORS_ORIGINS: "*"
+
+  # --- frontend: serve the prebuilt SPA (build it first; see scripts/serve_frontend.py) ---
+  - type: start_application
+    name: TFM Fraud UI
+    subdomain: tfm-ui
+    static_subdomain: true
+    script: scripts/serve_frontend.py
+    kernel: Python 3.10
+    cpu: 1
+    memory: 2

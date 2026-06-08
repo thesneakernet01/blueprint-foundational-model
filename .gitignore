@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Generated demo artifacts (produced by the export; can be large)
+demo_artifacts/
+
+# Node / frontend build (frontend/ has its own .gitignore too)
+node_modules/
+dist/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store

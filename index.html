@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transaction Foundation Model · Live Fraud Inference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0d10; --panel:#11161b; --panel-2:#0d1216; --line:#1e262d;
+    --ink:#e7edf2; --muted:#8a98a3; --faint:#5b6770;
+    --signal:#76b900; --signal-dim:#4d7a06; --amber:#ffb000; --danger:#ff5a52;
+    --grid:#121a20;
+    --mono:'IBM Plex Mono',ui-monospace,monospace;
+    --disp:'Archivo',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:
+      radial-gradient(1100px 600px at 82% -8%, rgba(118,185,0,.07), transparent 60%),
+      linear-gradient(var(--grid) 1px, transparent 1px) 0 0/40px 40px,
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0/40px 40px,
+      var(--bg);
+    color:var(--ink); font-family:var(--disp);
+    -webkit-font-smoothing:antialiased; min-height:100%;
+  }
+  .wrap{max-width:1320px;margin:0 auto;padding:22px 26px 60px}
+
+  /* ---- top bar ---- */
+  header{display:flex;align-items:center;justify-content:space-between;gap:18px;
+    padding-bottom:16px;border-bottom:1px solid var(--line);margin-bottom:22px}
+  .brand{display:flex;align-items:center;gap:14px}
+  .mark{width:34px;height:34px;border:1.5px solid var(--signal);border-radius:7px;
+    display:grid;place-items:center;color:var(--signal);font-weight:800;
+    box-shadow:0 0 22px rgba(118,185,0,.25) inset}
+  .brand h1{font-size:15px;letter-spacing:.14em;text-transform:uppercase;margin:0;font-weight:600}
+  .brand small{display:block;color:var(--faint);font-size:11px;letter-spacing:.18em;margin-top:3px}
+  .status{display:flex;gap:10px;align-items:center;font-family:var(--mono);font-size:11.5px}
+  .chip{padding:5px 11px;border:1px solid var(--line);border-radius:999px;color:var(--muted);
+    display:flex;align-items:center;gap:7px;background:var(--panel-2)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--faint)}
+  .chip.live .dot{background:var(--signal);box-shadow:0 0 9px var(--signal);animation:pulse 1.8s infinite}
+  .chip.fallback .dot{background:var(--amber)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+  /* ---- metrics strip ---- */
+  .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px}
+  .mcard{background:linear-gradient(180deg,var(--panel),var(--panel-2));
+    border:1px solid var(--line);border-radius:12px;padding:16px 18px;position:relative;overflow:hidden}
+  .mcard .tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
+  .mcard h3{margin:7px 0 12px;font-size:14px;font-weight:500;color:var(--ink)}
+  .mcard.featured{border-color:var(--signal-dim);box-shadow:0 0 0 1px rgba(118,185,0,.15)}
+  .mrow{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--mono);margin-top:6px}
+  .mrow span{color:var(--muted);font-size:11px}
+  .mrow b{font-size:18px;font-weight:600}
+  .lift{margin-top:11px;font-family:var(--mono);font-size:12px;color:var(--signal)}
+  .lift.neg{color:var(--danger)}
+
+  /* ---- main grid ---- */
+  .grid{display:grid;grid-template-columns:330px 1fr 380px;gap:18px;align-items:start}
+  @media(max-width:1180px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+  .card h2{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);
+    margin:0 0 14px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+  .card h2 em{font-style:normal;color:var(--faint);font-family:var(--mono);font-size:10.5px}
+
+  /* composer */
+  label{display:block;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin:12px 0 5px}
+  input,select{width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;
+    color:var(--ink);font-family:var(--mono);font-size:13px;padding:9px 11px;outline:none;transition:.15s}
+  input:focus,select:focus{border-color:var(--signal-dim);box-shadow:0 0 0 3px rgba(118,185,0,.1)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .examples{display:flex;flex-direction:column;gap:8px;margin-bottom:6px}
+  .ex{text-align:left;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);
+    border-radius:9px;padding:10px 12px;cursor:pointer;font-family:var(--disp);font-size:12.5px;transition:.15s}
+  .ex:hover{border-color:var(--signal-dim);transform:translateY(-1px)}
+  .ex small{display:block;color:var(--faint);font-family:var(--mono);font-size:10px;margin-top:3px;letter-spacing:.05em}
+  .run{width:100%;margin-top:18px;background:var(--signal);color:#08240a;border:none;border-radius:10px;
+    padding:13px;font-family:var(--disp);font-weight:700;font-size:14px;letter-spacing:.04em;cursor:pointer;transition:.15s}
+  .run:hover{filter:brightness(1.08)}
+  .run:active{transform:translateY(1px)}
+  .run:disabled{opacity:.5;cursor:wait}
+
+  /* verdict center */
+  .pipe{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;min-height:30px}
+  .tok{font-family:var(--mono);font-size:11px;padding:4px 8px;border-radius:6px;background:var(--panel-2);
+    border:1px solid var(--line);color:var(--muted);opacity:0;transform:translateY(4px);animation:tokin .3s forwards}
+  .tok.special{color:var(--signal);border-color:var(--signal-dim)}
+  @keyframes tokin{to{opacity:1;transform:none}}
+  .heads{display:flex;flex-direction:column;gap:16px}
+  .head .hlabel{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px}
+  .head .hlabel span{font-size:12.5px;color:var(--ink)}
+  .head .hlabel b{font-family:var(--mono);font-size:16px}
+  .track{height:12px;background:var(--panel-2);border:1px solid var(--line);border-radius:999px;overflow:hidden;position:relative}
+  .fill{height:100%;width:0;border-radius:999px;transition:width .9s cubic-bezier(.2,.7,.2,1)}
+  .fill.raw{background:linear-gradient(90deg,#3a5a78,#5b86b0)}
+  .fill.embed{background:linear-gradient(90deg,var(--signal-dim),var(--signal))}
+  .fill.combined{background:linear-gradient(90deg,var(--amber),#ffd166)}
+  .hmeta{font-family:var(--mono);font-size:10px;color:var(--faint);margin-top:5px;letter-spacing:.05em}
+  .verdict{margin-top:20px;padding:14px 16px;border-radius:11px;border:1px solid var(--line);
+    background:var(--panel-2);display:flex;align-items:center;gap:14px}
+  .vbadge{font-family:var(--mono);font-weight:600;font-size:12px;padding:6px 12px;border-radius:7px;letter-spacing:.08em}
+  .vbadge.ok{background:rgba(118,185,0,.14);color:var(--signal);border:1px solid var(--signal-dim)}
+  .vbadge.risk{background:rgba(255,90,82,.13);color:var(--danger);border:1px solid #5a2421}
+  .verdict p{margin:0;font-size:12.5px;color:var(--muted);line-height:1.5}
+  .placeholder{color:var(--faint);font-family:var(--mono);font-size:12px;text-align:center;padding:30px 0}
+
+  /* embedding map */
+  #map{width:100%;height:300px;display:block;border-radius:10px;background:
+    radial-gradient(420px 240px at 50% 40%, rgba(118,185,0,.04), transparent 70%),var(--panel-2);
+    border:1px solid var(--line)}
+  .legend{display:flex;gap:16px;margin-top:12px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .legend i{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle}
+  .footnote{color:var(--faint);font-family:var(--mono);font-size:10.5px;margin-top:14px;line-height:1.6;letter-spacing:.03em}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="mark">TFM</div>
+      <div>
+        <h1>Transaction Foundation Model</h1>
+        <small>LIVE FRAUD INFERENCE · NeMo AutoModel + RAPIDS</small>
+      </div>
+    </div>
+    <div class="status" id="status">
+      <span class="chip"><span class="dot"></span><span id="mode">connecting…</span></span>
+      <span class="chip"><span class="dot"></span><span id="gpu">GPU —</span></span>
+    </div>
+  </header>
+
+  <section class="metrics" id="metrics"></section>
+
+  <div class="grid">
+    <!-- LEFT: composer -->
+    <div class="card">
+      <h2>Transaction <em>input</em></h2>
+      <div class="examples" id="examples"></div>
+      <label>Amount</label>
+      <input id="Amount" value="$842.50">
+      <label>Merchant</label>
+      <input id="MerchantName" value="DIGITAL-GOODS-LLC">
+      <div class="two">
+        <div><label>City</label><input id="MerchantCity" value="ONLINE"></div>
+        <div><label>State</label><input id="MerchantState" value="ONLINE"></div>
+      </div>
+      <label>Channel</label>
+      <select id="UseChip">
+        <option>Online Transaction</option>
+        <option>Swipe Transaction</option>
+        <option>Chip Transaction</option>
+      </select>
+      <div class="two">
+        <div><label>MCC</label><input id="MCC" value="5942"></div>
+        <div><label>ZIP</label><input id="Zip" value="00000"></div>
+      </div>
+      <div class="two">
+        <div><label>Time (HH:MM)</label><input id="Time" value="03:14"></div>
+        <div><label>Card</label><input id="Card" value="0"></div>
+      </div>
+      <button class="run" id="run">Run inference ▸</button>
+    </div>
+
+    <!-- CENTER: verdict -->
+    <div class="card">
+      <h2>Model heads <em>raw · embeddings · combined</em></h2>
+      <div class="pipe" id="pipe"></div>
+      <div id="result">
+        <div class="placeholder">Load an example or compose a transaction, then run inference.</div>
+      </div>
+    </div>
+
+    <!-- RIGHT: embedding map -->
+    <div class="card">
+      <h2>Embedding map <em>UMAP · test set</em></h2>
+      <canvas id="map"></canvas>
+      <div class="legend">
+        <span><i style="background:#3a6ea5"></i>Normal</span>
+        <span><i style="background:var(--danger)"></i>Fraud</span>
+        <span><i style="background:var(--signal);box-shadow:0 0 8px var(--signal)"></i>This transaction</span>
+      </div>
+      <p class="footnote" id="footnote">512-d embeddings projected to 2-D. The decoder
+        learns the geometry from raw sequences — fraud clusters emerge with no labels.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let BG = [];      // umap background points
+let SUMMARY = null;
+
+/* ---------- status ---------- */
+async function loadStatus(){
+  try{
+    const s = await (await fetch('/api/status')).json();
+    const modeChip = $('mode').parentElement;
+    if(s.mode === 'real'){ modeChip.className='chip live'; $('mode').textContent='REAL · '+ (s.gpu?'GPU':'CPU'); }
+    else { modeChip.className='chip fallback'; $('mode').textContent='DEMO-FALLBACK'; }
+    $('gpu').textContent = s.gpu ? 'CUDA ready' : 'no GPU';
+    $('gpu').parentElement.className = 'chip' + (s.gpu?' live':'');
+  }catch(e){ $('mode').textContent='offline'; }
+}
+
+/* ---------- metrics strip ---------- */
+function renderMetrics(s){
+  SUMMARY = s;
+  const byKey = Object.fromEntries(s.models.map(m=>[m.key,m]));
+  const fmt = v => v==null ? '—' : v.toFixed(4);
+  const liftStr = (v)=> v==null ? '' : (v>=0?'+':'')+v.toFixed(1)+'%';
+  const cards = [
+    {m:byKey.raw, sub:'baseline', lift:null, feat:false},
+    {m:byKey.embed, sub:'foundation model', lift:s.lift.embed_ap_pct, feat:true},
+    {m:byKey.combined, sub:'raw + embeddings', lift:s.lift.combined_ap_pct, feat:false},
+  ];
+  $('metrics').innerHTML = cards.map(c=>`
+    <div class="mcard ${c.feat?'featured':''}">
+      <div class="tag">${c.sub}</div>
+      <h3>${c.m.label}</h3>
+      <div class="mrow"><span>ROC-AUC</span><b>${fmt(c.m.test_auc)}</b></div>
+      <div class="mrow"><span>Avg precision</span><b>${fmt(c.m.test_ap)}</b></div>
+      ${c.lift!=null?`<div class="lift ${c.lift<0?'neg':''}">${liftStr(c.lift)} AP vs baseline</div>`:''}
+    </div>`).join('');
+  if(s.placeholder){
+    $('metrics').insertAdjacentHTML('beforeend',
+      `<div class="footnote" style="grid-column:1/-1">${s.note||''}</div>`);
+  }
+}
+
+/* ---------- examples ---------- */
+function fillForm(t){
+  $('Amount').value=t['Amount']; $('MerchantName').value=t['Merchant Name'];
+  $('MerchantCity').value=t['Merchant City']; $('MerchantState').value=t['Merchant State'];
+  $('UseChip').value=t['Use Chip']; $('MCC').value=t['MCC']; $('Zip').value=t['Zip'];
+  $('Time').value=t['Time']; $('Card').value=t['Card'];
+}
+async function loadExamples(){
+  const ex = await (await fetch('/api/examples')).json();
+  $('examples').innerHTML = ex.map((e,i)=>`
+    <button class="ex" data-i="${i}">${e.label}
+      <small>${e.txn['Amount']} · ${e.txn['Use Chip'].split(' ')[0].toUpperCase()}${e.is_fraud!=null?' · ground truth: '+(e.is_fraud?'FRAUD':'LEGIT'):''}</small>
+    </button>`).join('');
+  $('examples').querySelectorAll('.ex').forEach(b=>{
+    b.onclick=()=>{ fillForm(ex[+b.dataset.i].txn); };
+  });
+}
+
+/* ---------- embedding map ---------- */
+function drawMap(live){
+  const c=$('map'), dpr=devicePixelRatio||1;
+  const w=c.clientWidth, h=c.clientHeight;
+  c.width=w*dpr; c.height=h*dpr;
+  const x=c.getContext('2d'); x.scale(dpr,dpr); x.clearRect(0,0,w,h);
+  const pts = BG.length?BG:[];
+  if(!pts.length){
+    x.fillStyle='#5b6770'; x.font='11px IBM Plex Mono'; x.textAlign='center';
+    x.fillText('UMAP background available after export_for_demo.py', w/2, h/2);
+    if(live){ /* still show the live point centered */ }
+    else return;
+  }
+  let xs=pts.map(p=>p.x), ys=pts.map(p=>p.y);
+  if(live){ xs=xs.concat(live.x); ys=ys.concat(live.y); }
+  const pad=18, minx=Math.min(...xs), maxx=Math.max(...xs),
+        miny=Math.min(...ys), maxy=Math.max(...ys);
+  const sx=v=>pad+(v-minx)/((maxx-minx)||1)*(w-2*pad);
+  const sy=v=>pad+(v-miny)/((maxy-miny)||1)*(h-2*pad);
+  for(const p of pts){
+    x.beginPath(); x.arc(sx(p.x),sy(p.y),p.fraud?2.2:1.4,0,7);
+    x.fillStyle=p.fraud?'rgba(255,90,82,.75)':'rgba(58,110,165,.45)'; x.fill();
+  }
+  if(live){
+    const lx=sx(live.x), ly=sy(live.y);
+    x.beginPath(); x.arc(lx,ly,12,0,7); x.fillStyle='rgba(118,185,0,.15)'; x.fill();
+    x.beginPath(); x.arc(lx,ly,5,0,7); x.fillStyle='#76b900';
+    x.shadowColor='#76b900'; x.shadowBlur=14; x.fill(); x.shadowBlur=0;
+    x.strokeStyle='#08240a'; x.lineWidth=1.5; x.stroke();
+  }
+}
+
+/* ---------- run inference ---------- */
+function readTxn(){
+  return {
+    "Amount":$('Amount').value, "Merchant Name":$('MerchantName').value,
+    "Merchant City":$('MerchantCity').value, "Merchant State":$('MerchantState').value,
+    "Use Chip":$('UseChip').value, "MCC":parseInt($('MCC').value)||0,
+    "Zip":$('Zip').value, "Time":$('Time').value, "Card":parseInt($('Card').value)||0,
+    "Year":2019,"Month":11,"Day":22,"User":0
+  };
+}
+const HEADS=[['raw','Raw features'],['embed','Embeddings'],['combined','Combined']];
+async function run(){
+  const btn=$('run'); btn.disabled=true; btn.textContent='Scoring…';
+  $('pipe').innerHTML=''; 
+  try{
+    const r = await (await fetch('/api/score',{method:'POST',
+      headers:{'Content-Type':'application/json'}, body:JSON.stringify(readTxn())})).json();
+
+    // tokens
+    (r.tokens||[]).slice(0,16).forEach((t,i)=>{
+      const sp=document.createElement('span');
+      sp.className='tok'+(t.startsWith('<')?' special':''); sp.textContent=t;
+      sp.style.animationDelay=(i*45)+'ms'; $('pipe').appendChild(sp);
+    });
+
+    const sc=r.scores, best=Math.max(sc.raw,sc.embed,sc.combined);
+    const decided = sc.combined>=0.5;
+    $('result').innerHTML=`
+      <div class="heads">${HEADS.map(([k,lab])=>`
+        <div class="head">
+          <div class="hlabel"><span>${lab}</span><b style="color:${k==='embed'?'var(--signal)':k==='combined'?'var(--amber)':'var(--ink)'}">${(sc[k]*100).toFixed(1)}%</b></div>
+          <div class="track"><div class="fill ${k}" data-w="${(sc[k]*100).toFixed(1)}"></div></div>
+          <div class="hmeta">P(fraud) · ${k==='raw'?(SUMMARY?SUMMARY.n_raw_features:'—')+'-d tabular':k==='embed'?(SUMMARY?SUMMARY.pca_dim:64)+'-d PCA embedding':'raw + embedding'}</div>
+        </div>`).join('')}
+      </div>
+      <div class="verdict">
+        <span class="vbadge ${decided?'risk':'ok'}">${decided?'FLAG · REVIEW':'CLEAR'}</span>
+        <p>Combined head returns <b style="color:var(--ink)">${(sc.combined*100).toFixed(1)}%</b> fraud probability.
+        ${r.mode==='real'?'Embedding extracted live from the '+r.embedding_dim+'-d decoder checkpoint.':'Synthetic score — run <code>export_for_demo.py</code> on the GPU box for live model output.'}</p>
+      </div>`;
+    requestAnimationFrame(()=>{ document.querySelectorAll('.fill').forEach(f=>f.style.width=f.dataset.w+'%'); });
+    if(r.position) drawMap(r.position);
+  }catch(e){
+    $('result').innerHTML='<div class="placeholder">Request failed: '+e+'</div>';
+  }
+  btn.disabled=false; btn.textContent='Run inference ▸';
+}
+
+/* ---------- boot ---------- */
+(async()=>{
+  await loadStatus();
+  renderMetrics(await (await fetch('/api/summary')).json());
+  await loadExamples();
+  try{ BG = await (await fetch('/api/umap')).json(); }catch(e){ BG=[]; }
+  drawMap(null);
+  $('run').onclick=run;
+  addEventListener('resize',()=>drawMap(null));
+})();
+</script>
+</body>
+</html>

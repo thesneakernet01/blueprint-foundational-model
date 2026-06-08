@@ -1,0 +1,6 @@
+# Demo-layer dependencies. The heavy stack — torch, transformers, cudf, cuml,
+# xgboost — already ships inside the NeMo Framework container (25.09.01+).
+fastapi>=0.110
+uvicorn[standard]>=0.27
+pydantic>=2.5
+joblib>=1.3

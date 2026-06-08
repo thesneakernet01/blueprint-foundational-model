@@ -16,7 +16,13 @@ import os
 import socketserver
 from pathlib import Path
 
-DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+# `__file__` is undefined when this runs as a Cloudera notebook cell; fall back
+# to the working directory (the project root by CML convention).
+try:
+    _ROOT = Path(__file__).resolve().parent.parent
+except NameError:
+    _ROOT = Path.cwd()
+DIST = _ROOT / "frontend" / "dist"
 PORT = int(os.environ.get("CDSW_APP_PORT", "8090"))
 
 

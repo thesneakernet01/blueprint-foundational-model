@@ -10,7 +10,13 @@ import subprocess
 import sys
 from pathlib import Path
 
-REQS = Path(__file__).resolve().parent.parent / "requirements-demo.txt"
+# `__file__` is undefined when this runs as a Cloudera notebook cell; fall back
+# to the working directory (the project root by CML convention).
+try:
+    _ROOT = Path(__file__).resolve().parent.parent
+except NameError:
+    _ROOT = Path.cwd()
+REQS = _ROOT / "requirements-demo.txt"
 
 if __name__ == "__main__":
     subprocess.run(

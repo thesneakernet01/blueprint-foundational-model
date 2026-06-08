@@ -24,7 +24,12 @@ import sys
 from pathlib import Path
 
 # Make the demo package importable when run as `python tfm-demo/export_for_demo.py`.
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+# `__file__` is undefined in a Cloudera notebook cell; fall back to the cwd.
+try:
+    _ROOT = Path(__file__).resolve().parent
+except NameError:
+    _ROOT = Path.cwd()
+sys.path.insert(0, str(_ROOT))
 from tfm_demo.export import run_export  # noqa: E402
 
 

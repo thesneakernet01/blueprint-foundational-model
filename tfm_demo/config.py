@@ -18,7 +18,13 @@ from pathlib import Path
 # tfm_demo/ lives inside the demo project root (the `tfm-demo/` folder), which
 # itself sits inside the cloned blueprint repo so we can import its `src/` and
 # load the checkpoint under `models/`.
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+# In a Cloudera notebook/interactive session the module may be exec'd as a cell,
+# where `__file__` is undefined — fall back to the working directory (the project
+# root, by CML convention) in that case.
+try:
+    PROJECT_ROOT = Path(__file__).resolve().parent.parent
+except NameError:
+    PROJECT_ROOT = Path.cwd()
 REPO_ROOT = PROJECT_ROOT.parent                       # the cloned blueprint repo
 ARTIFACTS = PROJECT_ROOT / "demo_artifacts"
 MODEL_DIR = REPO_ROOT / "models" / "decoder-foundation-model"

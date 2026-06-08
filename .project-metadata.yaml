@@ -37,8 +37,12 @@ environment_variables:
     default: ""
     description: >
       Full URL of the deployed tfm-api application (e.g.
-      https://tfm-api.<your-cml-domain>). The React SPA bakes this in at BUILD
-      time, so set it before running `npm run build` in frontend/.
+      https://tfm-api.<your-cml-domain>). REQUIRED for the two-app split: the UI
+      and API are separate CML applications on different subdomains, so the SPA
+      must be built with the API's absolute URL. The "Build frontend SPA" Job
+      bakes this in (Vite reads it at build time). If left empty the SPA falls
+      back to http://localhost:8000, which only works for local dev — set it to
+      the tfm-api URL before the build Job runs.
     required: false
 
 # Recommended runtime. REAL mode needs CUDA + RAPIDS (cudf/cuml) + torch, so a

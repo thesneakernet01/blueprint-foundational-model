@@ -52,12 +52,22 @@ runtimes:
 
 tasks:
   # --- one-time setup: add the web layer on top of the runtime ---------------
-  - type: run_session
+  # A Job (not a session) runs install_deps.py as a real process, so `__file__`
+  # is defined and it's the idiomatic shape for a one-shot, non-interactive step.
+  - type: create_job
     name: Install demo dependencies
+    entity_label: install_deps
     script: scripts/install_deps.py
+    arguments: None
+    short_summary: Install the thin demo web layer (fastapi/uvicorn/pydantic/joblib).
     kernel: Python 3.10
     cpu: 2
     memory: 4
+    environment:
+      TASK_TYPE: CREATE/RUN_JOB
+  - type: run_job
+    entity_label: install_deps
+    short_summary: Run the demo-dependency install.
 
   # --- GPU backend: runs the NVIDIA TFM inference + export -------------------
   - type: start_application

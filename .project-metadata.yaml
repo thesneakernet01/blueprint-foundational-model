@@ -69,6 +69,26 @@ tasks:
     entity_label: install_deps
     short_summary: Run the demo-dependency install.
 
+  # --- build the SPA: runtimes ship no Node, so install it user-locally ------
+  # build_frontend.py downloads Node into ~/.local/node (never a global prefix,
+  # no root) and runs `npm ci && npm run build` -> frontend/dist. A committed
+  # bundle is shipped too, but this regenerates it fresh in-cluster (and bakes
+  # in VITE_API_BASE if set).
+  - type: create_job
+    name: Build frontend SPA
+    entity_label: build_frontend
+    script: scripts/build_frontend.py
+    arguments: None
+    short_summary: Install Node user-locally and build the React SPA bundle.
+    kernel: Python 3.10
+    cpu: 2
+    memory: 4
+    environment:
+      TASK_TYPE: CREATE/RUN_JOB
+  - type: run_job
+    entity_label: build_frontend
+    short_summary: Run the SPA build.
+
   # --- GPU backend: runs the NVIDIA TFM inference + export -------------------
   - type: start_application
     name: TFM Fraud API

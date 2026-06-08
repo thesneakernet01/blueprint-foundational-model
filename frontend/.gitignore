@@ -1,5 +1,6 @@
 node_modules
-dist
+# dist is intentionally committed: it's the prebuilt SPA bundle CML serves
+# (runtimes have no Node to build it). See scripts/serve_frontend.py.
 dist-ssr
 *.local
 .DS_Store

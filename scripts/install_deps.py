@@ -14,11 +14,10 @@ left behind, so re-runs converge on a clean cu12-only environment.
 Set SKIP_GPU_DEPS=1 to install just the web layer (e.g. a laptop with no GPU,
 where the engine falls back to DEMO-FALLBACK mode anyway).
 
-NOTE on the hard exit: after a big GPU install some CUDA/RAPIDS wheels leave a
-lingering non-daemon thread or background helper alive in the interpreter, so a
-plain return can leave the CML Job process running forever even though the work
-is done. We flush and os._exit(0) to guarantee the Job terminates as soon as the
-installs succeed.
+This script exits normally (no os._exit): CML runs Job scripts inside the
+engine's own process, and a hard low-level exit bypasses the harness's
+completion handling and gets reported as an abnormal "status 1". The big GPU
+install is just slow (multi-GB wheels) — let it finish and return cleanly.
 """
 
 import os
@@ -101,8 +100,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-    # Force-terminate: the work is done and committed to disk; don't let a
-    # lingering library thread keep the Job process alive (see module docstring).
     sys.stdout.flush()
     sys.stderr.flush()
-    os._exit(0)

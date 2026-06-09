@@ -78,7 +78,7 @@ tasks:
     short_summary: Install the web layer + the NVIDIA/GPU Python stack (CUDA assumed present).
     kernel: Python 3.12
     cpu: 2
-    memory: 8
+    memory: 16
     gpu: 1
     environment:
       TASK_TYPE: CREATE/RUN_JOB

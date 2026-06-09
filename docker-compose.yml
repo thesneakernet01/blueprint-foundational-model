@@ -1,0 +1,29 @@
+# Docker Compose for demoing the TFM UI off-GPU.
+#
+#   docker compose up --build      then open  http://localhost:8100
+#
+# Runs the real React SPA against the real FastAPI backend, but with none of the
+# heavy stack — so the engine serves DEMO-FALLBACK mode: synthetic, clearly
+# *labelled* scores (the status badge reads DEMO-FALLBACK). This is for showing
+# the UI; it does not run live inference (that needs the GPU/model/data in CML).
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "7100"
+    expose:
+      - "7100"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+    ports:
+      - "8100:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

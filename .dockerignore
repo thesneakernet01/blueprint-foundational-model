@@ -1,0 +1,11 @@
+# Keep the build context small/fast — these are never needed in the images.
+.git
+models
+data
+demo_artifacts
+**/node_modules
+frontend/dist
+**/__pycache__
+*.pyc
+.venv
+venv

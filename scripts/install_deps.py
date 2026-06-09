@@ -9,6 +9,12 @@ Two layers, both installed here:
 
 Set SKIP_GPU_DEPS=1 to install just the web layer (e.g. a laptop with no GPU,
 where the engine falls back to DEMO-FALLBACK mode anyway).
+
+NOTE on the hard exit: after a big GPU install some CUDA/RAPIDS wheels leave a
+lingering non-daemon thread or background helper alive in the interpreter, so a
+plain return can leave the CML Job process running forever even though the work
+is done. We flush and os._exit(0) to guarantee the Job terminates as soon as the
+installs succeed.
 """
 
 import os
@@ -28,18 +34,29 @@ GPU_REQS = _ROOT / "requirements-gpu.txt"
 
 
 def _pip_install(reqs: Path) -> None:
+    # stdin=DEVNULL so a build-from-sdist can never block waiting on a prompt.
     subprocess.run(
-        [sys.executable, "-m", "pip", "install", "-r", str(reqs)],
+        [sys.executable, "-m", "pip", "install", "--no-input", "-r", str(reqs)],
+        stdin=subprocess.DEVNULL,
         check=True,
     )
 
 
-if __name__ == "__main__":
+def main() -> None:
     _pip_install(DEMO_REQS)
-    print("Demo (web-layer) dependencies installed.")
+    print("Demo (web-layer) dependencies installed.", flush=True)
 
     if os.environ.get("SKIP_GPU_DEPS"):
-        print("SKIP_GPU_DEPS set — skipping the NVIDIA/GPU stack.")
+        print("SKIP_GPU_DEPS set — skipping the NVIDIA/GPU stack.", flush=True)
     else:
         _pip_install(GPU_REQS)
-        print("NVIDIA/GPU dependencies installed.")
+        print("NVIDIA/GPU dependencies installed.", flush=True)
+
+
+if __name__ == "__main__":
+    main()
+    # Force-terminate: the work is done and committed to disk; don't let a
+    # lingering library thread keep the Job process alive (see module docstring).
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(0)

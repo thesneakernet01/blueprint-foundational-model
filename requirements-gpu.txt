@@ -1,0 +1,29 @@
+# GPU / NVIDIA stack for REAL mode. CUDA itself is already installed in the
+# runtime; these are the Python components the engine and exporter import:
+#   - cudf / cuml / cupy  (RAPIDS): GPU tokenizer dataframes, UMAP + PCA
+#   - torch + transformers: the decoder foundation model + tokenizer
+#   - xgboost + scikit-learn: the three fraud heads and the preprocessing/PCA
+# Installed by scripts/install_deps.py alongside requirements-demo.txt.
+#
+# RAPIDS and some CUDA wheels live on NVIDIA's index, not PyPI:
+--extra-index-url https://pypi.nvidia.com
+
+# RAPIDS — cu12 wheels bundle their own CUDA 12 runtime and only need a CUDA 12
+# driver, which the runtime already provides. Keep cudf and cuml versions in
+# lockstep; bump both together if the runtime's CUDA driver requires it.
+cudf-cu12==24.12.*
+cuml-cu12==24.12.*
+cupy-cuda12x
+
+# Decoder foundation model + tokenizer.
+torch
+transformers
+accelerate
+safetensors
+sentencepiece
+
+# Fraud heads + the sklearn preprocessing/PCA used at export time.
+xgboost
+scikit-learn
+numpy
+pandas

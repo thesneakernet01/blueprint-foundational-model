@@ -1,11 +1,13 @@
 # Cloudera AI / CML Applied ML Prototype (AMP) project metadata.
 # Spec: https://docs.cloudera.com/machine-learning/1.5.4/applied-ml-prototypes/topics/ml-amp-project-spec.html
 #
-# Deploys two applications in one project:
-#   1. tfm-api  — the FastAPI backend (app.py) that runs the NVIDIA TFM stack on a GPU
-#   2. tfm-ui   — the standalone React SPA (frontend/dist) that calls the API
-#
-# The backend binds CDSW_APP_PORT on 127.0.0.1 automatically (see tfm_demo/config.py).
+# Deploys ONE application (scripts/serve_app.py) that runs both halves of the
+# demo in a single GPU container — CML exposes one public port per application
+# and separate apps can't talk over localhost, so they must share a container:
+#   * FastAPI backend (NVIDIA TFM stack) — private on 127.0.0.1:$BACKEND_PORT
+#   * Vite preview server (React SPA)    — public on CDSW_APP_PORT, proxying
+#                                          /api/* inward to the backend
+# The SPA therefore calls same-origin /api/* and needs no cross-origin config.
 # Artifact export is triggered from the UI (POST /api/export) and runs on the GPU.
 
 name: Transaction Foundation Model — Live Fraud Inference
@@ -27,22 +29,27 @@ date: "2026-06-08"
 shared_memory_limit: 1
 
 environment_variables:
-  CORS_ORIGINS:
-    default: "*"
+  BACKEND_PORT:
+    default: "7100"
     description: >
-      Comma-separated CORS allowlist for the API. Leave as "*" for the demo, or
-      set it to the tfm-ui application URL to lock the API down.
+      Private in-container port the FastAPI backend binds on 127.0.0.1. Vite
+      proxies /api/* to it; both the app and the build read this. Rarely needs
+      changing — only if 7100 collides with something else in the runtime.
+    required: false
+  SKIP_GPU_DEPS:
+    default: ""
+    description: >
+      Set to 1 to skip installing the NVIDIA/GPU Python stack (requirements-gpu
+      .txt) and run web-layer only — the engine then serves DEMO-FALLBACK mode.
+      Leave empty for REAL mode on a GPU runtime.
     required: false
   VITE_API_BASE:
     default: ""
     description: >
-      Full URL of the deployed tfm-api application (e.g.
-      https://tfm-api.<your-cml-domain>). REQUIRED for the two-app split: the UI
-      and API are separate CML applications on different subdomains, so the SPA
-      must be built with the API's absolute URL. The "Build frontend SPA" Job
-      bakes this in (Vite reads it at build time). If left empty the SPA falls
-      back to http://localhost:8000, which only works for local dev — set it to
-      the tfm-api URL before the build Job runs.
+      Optional override for the API base URL. Leave EMPTY for the standard
+      single-application deployment — the SPA calls same-origin /api/* and Vite
+      proxies it to the backend. Only set this (to an absolute URL) if pointing
+      the UI at a separately-hosted backend.
     required: false
 
 # Recommended runtime. REAL mode needs CUDA + RAPIDS (cudf/cuml) + torch, so a
@@ -59,25 +66,25 @@ tasks:
   # A Job (not a session) runs install_deps.py as a real process, so `__file__`
   # is defined and it's the idiomatic shape for a one-shot, non-interactive step.
   - type: create_job
-    name: Install demo dependencies
+    name: Install dependencies
     entity_label: install_deps
     script: scripts/install_deps.py
     arguments: None
-    short_summary: Install the thin demo web layer (fastapi/uvicorn/pydantic/joblib).
+    short_summary: Install the web layer + the NVIDIA/GPU Python stack (CUDA assumed present).
     kernel: Python 3.10
     cpu: 2
-    memory: 4
+    memory: 8
+    gpu: 1
     environment:
       TASK_TYPE: CREATE/RUN_JOB
   - type: run_job
     entity_label: install_deps
-    short_summary: Run the demo-dependency install.
+    short_summary: Run the dependency install.
 
   # --- build the SPA: runtimes ship no Node, so install it user-locally ------
   # build_frontend.py downloads Node into ~/.local/node (never a global prefix,
   # no root) and runs `npm ci && npm run build` -> frontend/dist. A committed
-  # bundle is shipped too, but this regenerates it fresh in-cluster (and bakes
-  # in VITE_API_BASE if set).
+  # bundle is shipped too, but this regenerates it fresh in-cluster.
   - type: create_job
     name: Build frontend SPA
     entity_label: build_frontend
@@ -93,28 +100,19 @@ tasks:
     entity_label: build_frontend
     short_summary: Run the SPA build.
 
-  # --- GPU backend: runs the NVIDIA TFM inference + export -------------------
+  # --- the single application: backend + UI in one GPU container -------------
+  # serve_app.py runs uvicorn (private :$BACKEND_PORT) and Vite preview (public
+  # CDSW_APP_PORT), with Vite proxying /api/* inward. One public port, one app.
   - type: start_application
-    name: TFM Fraud API
-    subdomain: tfm-api
+    name: TFM Fraud Demo
+    subdomain: tfm-demo
     static_subdomain: true
-    script: app.py
+    script: scripts/serve_app.py
     kernel: Python 3.10
     cpu: 2
     memory: 16
     gpu: 1
-    # The SPA calls this cross-origin without a CML session cookie, so the API
-    # endpoint must be reachable unauthenticated (demo). Pair with CORS_ORIGINS.
+    # Public demo: the app is reachable without a CML session cookie.
     bypass_authentication: true
     environment_variables:
-      CORS_ORIGINS: "*"
-
-  # --- frontend: serve the prebuilt SPA (build it first; see scripts/serve_frontend.py) ---
-  - type: start_application
-    name: TFM Fraud UI
-    subdomain: tfm-ui
-    static_subdomain: true
-    script: scripts/serve_frontend.py
-    kernel: Python 3.10
-    cpu: 1
-    memory: 2
+      BACKEND_PORT: "7100"

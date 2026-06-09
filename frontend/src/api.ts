@@ -1,13 +1,10 @@
 // Typed client for the TFM live-demo FastAPI backend (../app.py).
-// The SPA is served standalone, so it talks to the backend cross-origin; the
-// base URL must be baked in at build time via VITE_API_BASE.
-//
-// In CML the UI and API are separate applications on different subdomains, so
-// VITE_API_BASE has to be the absolute tfm-api URL — there is no working
-// default. `||` (not `??`) is deliberate: an empty string (the AMP env-var
-// default) collapses to the localhost dev default rather than silently
-// producing a same-origin relative base that would hit the UI app, not the API.
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
+// The UI and API ship as one CML application: Vite owns the public port and
+// proxies /api/* to the backend on 127.0.0.1 (see frontend/vite.config.ts).
+// So the SPA talks to its own origin with relative URLs — no cross-origin, no
+// build-time API URL. VITE_API_BASE remains an optional override for the rare
+// case of pointing at a separately-hosted backend.
+const API_BASE = import.meta.env.VITE_API_BASE || '';
 
 export type Mode = 'real' | 'demo-fallback' | string;
 

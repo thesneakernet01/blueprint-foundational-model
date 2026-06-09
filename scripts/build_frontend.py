@@ -7,6 +7,9 @@ needed and nothing outside the user's home is touched. The downloaded Node's
 `bin/` is put on PATH only for the child npm processes, then we run
 `npm ci && npm run build` in `frontend/`, producing `frontend/dist`.
 
+`ensure_node()` / `npm_env()` are reused by `scripts/serve_app.py` to run the
+Vite preview server from the same user-local toolchain.
+
 Run:
     python scripts/build_frontend.py
 Override the toolchain location / version with $NODE_PREFIX / $NODE_VERSION.
@@ -25,7 +28,7 @@ from pathlib import Path
 NODE_VERSION = os.environ.get("NODE_VERSION", "v20.18.0")  # current LTS
 
 
-def _project_root() -> Path:
+def project_root() -> Path:
     # `__file__` is undefined when exec'd as a notebook cell; fall back to cwd.
     try:
         return Path(__file__).resolve().parent.parent
@@ -44,7 +47,7 @@ def _node_dist() -> tuple[str, str]:
     return name, f"https://nodejs.org/dist/{NODE_VERSION}/{name}.tar.xz"
 
 
-def _ensure_node() -> Path:
+def ensure_node() -> Path:
     """Install Node user-locally if absent; return its bin/ directory."""
     # Default to ~/.local/node — a per-user prefix. Never /usr or a global npm
     # prefix, so this needs no elevated privileges.
@@ -66,13 +69,17 @@ def _ensure_node() -> Path:
     return node_bin
 
 
-def main() -> None:
-    node_bin = _ensure_node()
+def npm_env(node_bin: Path) -> dict[str, str]:
+    """A copy of os.environ with the user-local Node bin/ prepended to PATH."""
     env = dict(os.environ)
-    # Prepend only for the npm children; we never mutate the global environment.
     env["PATH"] = f"{node_bin}{os.pathsep}{env.get('PATH', '')}"
+    return env
 
-    frontend = _project_root() / "frontend"
+
+def build() -> None:
+    """Install deps and produce frontend/dist from the user-local toolchain."""
+    env = npm_env(ensure_node())
+    frontend = project_root() / "frontend"
     install = ["npm", "ci"] if (frontend / "package-lock.json").exists() else ["npm", "install"]
     subprocess.run(install, cwd=frontend, env=env, check=True)
     subprocess.run(["npm", "run", "build"], cwd=frontend, env=env, check=True)
@@ -80,4 +87,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    build()

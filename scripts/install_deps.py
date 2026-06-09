@@ -1,11 +1,17 @@
 # SPDX-License-Identifier: Apache-2.0
-"""AMP setup task: install the thin demo-layer Python deps.
+"""AMP setup task: install the Python deps for the demo.
 
-The heavy NVIDIA stack (torch, transformers, cudf, cuml, xgboost) is expected to
-already live in the project's ML Runtime / NeMo container; this only adds the web
-layer (fastapi/uvicorn/pydantic/joblib) on top.
+Two layers, both installed here:
+  * requirements-demo.txt — the thin web layer (fastapi/uvicorn/pydantic/joblib).
+  * requirements-gpu.txt   — the NVIDIA / GPU stack the engine needs for REAL
+    mode (cudf/cuml/cupy, torch/transformers, xgboost/scikit-learn). CUDA itself
+    is assumed already present in the runtime; these are only the Python wheels.
+
+Set SKIP_GPU_DEPS=1 to install just the web layer (e.g. a laptop with no GPU,
+where the engine falls back to DEMO-FALLBACK mode anyway).
 """
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -16,11 +22,24 @@ try:
     _ROOT = Path(__file__).resolve().parent.parent
 except NameError:
     _ROOT = Path.cwd()
-REQS = _ROOT / "requirements-demo.txt"
 
-if __name__ == "__main__":
+DEMO_REQS = _ROOT / "requirements-demo.txt"
+GPU_REQS = _ROOT / "requirements-gpu.txt"
+
+
+def _pip_install(reqs: Path) -> None:
     subprocess.run(
-        [sys.executable, "-m", "pip", "install", "-r", str(REQS)],
+        [sys.executable, "-m", "pip", "install", "-r", str(reqs)],
         check=True,
     )
-    print("Demo dependencies installed.")
+
+
+if __name__ == "__main__":
+    _pip_install(DEMO_REQS)
+    print("Demo (web-layer) dependencies installed.")
+
+    if os.environ.get("SKIP_GPU_DEPS"):
+        print("SKIP_GPU_DEPS set — skipping the NVIDIA/GPU stack.")
+    else:
+        _pip_install(GPU_REQS)
+        print("NVIDIA/GPU dependencies installed.")

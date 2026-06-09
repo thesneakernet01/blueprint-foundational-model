@@ -60,13 +60,43 @@ def _trim(nb):
     return nb
 
 
+def _execute(nb) -> None:
+    """Run the notebook to completion.
+
+    CML runs this Job inside the engine's ipykernel, which already has a running
+    asyncio loop; NotebookClient.execute() calls run_until_complete() and would
+    raise "This event loop is already running". Run it in a worker thread, which
+    starts with no running loop, and re-raise any error on the main thread.
+    """
+    import threading
+    from nbclient import NotebookClient
+
+    holder: dict = {}
+
+    def _run() -> None:
+        try:
+            NotebookClient(
+                nb,
+                timeout=int(os.environ.get("PREP_CELL_TIMEOUT", "5400")),
+                kernel_name="python3",
+                resources={"metadata": {"path": str(PROJECT_ROOT)}},
+            ).execute()
+        except BaseException as exc:                       # noqa: BLE001
+            holder["err"] = exc
+
+    t = threading.Thread(target=_run)
+    t.start()
+    t.join()
+    if "err" in holder:
+        raise holder["err"]
+
+
 def main() -> None:
     if _already_present():
         print(f"prepare_data: temporal splits already present in {TEMPORAL_DIR}")
         return
 
     import nbformat
-    from nbclient import NotebookClient
 
     print(f"prepare_data: fetching NB01 from {NB01_URL}")
     nb = nbformat.reads(urllib.request.urlopen(NB01_URL, timeout=60).read().decode(),
@@ -78,12 +108,7 @@ def main() -> None:
     os.environ.setdefault("MPLBACKEND", "Agg")
     print(f"prepare_data: running {len(nb.cells)} cells "
           f"(downloads ~2.4 GB from IBM Box — this takes a while) ...")
-    NotebookClient(
-        nb,
-        timeout=int(os.environ.get("PREP_CELL_TIMEOUT", "5400")),
-        kernel_name="python3",
-        resources={"metadata": {"path": str(PROJECT_ROOT)}},
-    ).execute()
+    _execute(nb)
 
     missing = [f for f in REQUIRED if not (TEMPORAL_DIR / f).exists()]
     if missing:

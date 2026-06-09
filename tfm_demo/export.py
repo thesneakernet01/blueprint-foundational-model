@@ -64,31 +64,55 @@ Progress = Optional[Callable[[str], None]]
 # --------------------------------------------------------------------------- #
 # data loading + feature engineering
 # --------------------------------------------------------------------------- #
+# Source columns read from each split. "Hour" is excluded — it is derived from
+# "Time" below, not stored. Projecting columns keeps the GPU read lean.
+_SOURCE_COLS = list(dict.fromkeys(
+    [c for c in (*TOKENIZER_COLS, *RAW_FEATURE_COLS) if c != "Hour"]
+    + [FRAUD_COL, "Merchant City"]
+))
+
+
 def _load_split(name: str):
-    """Read a temporal parquet to pandas; return (tokenizer_input, engineered)."""
+    """Read a temporal parquet into a cuDF frame on the GPU and engineer features
+    there; return (tokenizer_input, engineered) as cuDF frames.
+
+    The whole split (up to PREP_TRAIN_CAP rows) stays on the GPU — only the
+    ~EMBED_MAX-row selections are later copied to host (see run_export). The old
+    code did `.to_pandas()` on the *full* frame for all three splits at once,
+    which materialised millions of Python strings and OOM-killed the process on
+    the 16 GB host container before the model even loaded. Keeping the heavy
+    frames in cuDF fixes that and keeps the pipeline GPU-native (RAPIDS).
+    """
     import cudf
-    pdf = cudf.read_parquet(str(TEMPORAL_DIR / name)).to_pandas()
+    gdf = cudf.read_parquet(str(TEMPORAL_DIR / name), columns=_SOURCE_COLS)
     # Tokenizer wants the raw columns (Amount still a "$..." string), captured
     # before we coerce numerics for the raw-feature head.
-    tok = pdf[TOKENIZER_COLS].copy()
-    pdf = pdf.copy()
-    pdf["Hour"] = pdf["Time"].str.split(":", n=1, expand=True)[0].astype(int)
-    pdf["Amount"] = pdf["Amount"].str.replace("$", "", regex=False)\
-        .str.replace(",", "").astype(float)
-    return tok, pdf
+    tok = gdf[TOKENIZER_COLS].copy()
+    gdf = gdf.copy()
+    gdf["Hour"] = gdf["Time"].str.split(":", n=1, expand=True)[0].astype("int32")
+    gdf["Amount"] = (gdf["Amount"].str.replace("$", "", regex=False)
+                     .str.replace(",", "").astype("float64"))
+    return tok, gdf
 
 
-def _labels(pdf) -> np.ndarray:
-    m = (pdf[FRAUD_COL] == "Yes") | (pdf[FRAUD_COL].astype(str) == "1")
-    return m.astype(int).to_numpy()
+def _labels(df) -> np.ndarray:
+    """Binary fraud labels as a host numpy array (works on cuDF or pandas)."""
+    m = (df[FRAUD_COL] == "Yes") | (df[FRAUD_COL].astype(str) == "1")
+    return np.asarray(m.astype("int32").to_numpy())
 
 
-def _balanced_train_sel(train_pdf) -> np.ndarray:
-    """NB05's balanced training subsample (~10% fraud), capped at EMBED_MAX."""
-    fraud_mask = (train_pdf[FRAUD_COL] == "Yes") | (train_pdf[FRAUD_COL].astype(str) == "1")
-    fraud_idx = train_pdf.index[fraud_mask].to_numpy()
-    normal_idx = train_pdf.index[~fraud_mask].to_numpy()
-    target = min(EMBED_MAX, len(train_pdf))
+def _balanced_train_sel(train_df) -> np.ndarray:
+    """NB05's balanced training subsample (~10% fraud), capped at EMBED_MAX.
+
+    Returns positional indices (0..N-1) — equal to the cuDF RangeIndex labels, so
+    `.loc[sel]` selects the same rows. Labels are pulled to host once (a single
+    int column) rather than boolean-masking the GPU index, which keeps this
+    independent of cuDF Index indexing quirks.
+    """
+    y = _labels(train_df)
+    fraud_idx = np.nonzero(y == 1)[0]
+    normal_idx = np.nonzero(y == 0)[0]
+    target = min(EMBED_MAX, len(train_df))
     np.random.seed(42)
     n_fraud = min(len(fraud_idx), int(target * 0.1))
     n_normal = min(len(normal_idx), target - n_fraud)
@@ -98,13 +122,15 @@ def _balanced_train_sel(train_pdf) -> np.ndarray:
     return sel
 
 
-def _natural_sel(pdf, seed: int) -> np.ndarray:
-    """Random subsample preserving the natural fraud rate (for val/test eval)."""
-    idx = pdf.index.to_numpy()
-    if len(idx) <= EMBED_MAX:
-        return idx
+def _natural_sel(df, seed: int) -> np.ndarray:
+    """Random subsample preserving the natural fraud rate (for val/test eval).
+
+    Returns positional indices into the cuDF RangeIndex (label == position)."""
+    n = len(df)
+    if n <= EMBED_MAX:
+        return np.arange(n)
     np.random.seed(seed)
-    return np.sort(np.random.choice(idx, EMBED_MAX, replace=False))
+    return np.sort(np.random.choice(n, EMBED_MAX, replace=False))
 
 
 # --------------------------------------------------------------------------- #
@@ -131,11 +157,12 @@ def _build_inference(emit):
 
 
 def _embed_rows(tok_df, pipeline_cls, inference, emit) -> np.ndarray:
-    """Tokenize a frame of raw transactions and extract last-token embeddings."""
-    import cudf
+    """Tokenize a (cuDF) frame of raw transactions and extract last-token embeddings."""
     import torch
 
-    gdf = cudf.DataFrame.from_pandas(tok_df[TOKENIZER_COLS].reset_index(drop=True))
+    # tok_df is already a cuDF frame (the selected rows) — feed the GPU tokenizer
+    # directly, no host roundtrip.
+    gdf = tok_df[TOKENIZER_COLS].reset_index(drop=True)
     pip = pipeline_cls(merchant_hash_size=MERCHANT_HASH_SIZE)
     gdf = pip.preprocess(gdf)
     pip.fit(gdf)
@@ -225,9 +252,10 @@ def run_export(progress: Progress = None) -> Dict:
     Xte_pca = pca.transform(X_test_e)
 
     # ---- raw tabular features (NB05), aligned to the embedded rows --------
-    X_train_raw = train_pdf.loc[sel_tr, RAW_FEATURE_COLS].reset_index(drop=True)
-    X_val_raw = val_pdf.loc[sel_va, RAW_FEATURE_COLS].reset_index(drop=True)
-    X_test_raw = test_pdf.loc[sel_te, RAW_FEATURE_COLS].reset_index(drop=True)
+    # Copy only the selected rows (~EMBED_MAX) to host pandas for sklearn.
+    X_train_raw = train_pdf.loc[sel_tr, RAW_FEATURE_COLS].reset_index(drop=True).to_pandas()
+    X_val_raw = val_pdf.loc[sel_va, RAW_FEATURE_COLS].reset_index(drop=True).to_pandas()
+    X_test_raw = test_pdf.loc[sel_te, RAW_FEATURE_COLS].reset_index(drop=True).to_pandas()
 
     preproc = make_column_transformer(
         (OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1),
@@ -275,7 +303,8 @@ def run_export(progress: Progress = None) -> Dict:
 
     # ---- real example transactions to click ------------------------------
     examples = []
-    test_raw_reset = test_pdf.loc[sel_te].reset_index(drop=True)
+    # Selected test rows to host pandas for per-row .iloc element access.
+    test_raw_reset = test_pdf.loc[sel_te].reset_index(drop=True).to_pandas()
     for want_fraud, label in [(1, "Real fraud (test set)"),
                               (0, "Real legitimate (test set)"),
                               (1, "Real fraud #2 (test set)")]:

@@ -105,6 +105,25 @@ tasks:
     entity_label: build_frontend
     short_summary: Run the SPA build.
 
+  # --- fetch the foundation-model checkpoint (Git LFS blob, ~56 MB) ----------
+  # fetch_model.py downloads models/decoder-foundation-model from the NVIDIA TFM
+  # blueprint over plain HTTPS (no git/git-lfs needed). REAL mode + in-app
+  # embedding generation require it. No GPU; stdlib only.
+  - type: create_job
+    name: Fetch model checkpoint
+    entity_label: fetch_model
+    script: scripts/fetch_model.py
+    arguments: None
+    short_summary: Download the decoder-foundation-model checkpoint into ./models.
+    kernel: Python 3.12
+    cpu: 2
+    memory: 4
+    environment:
+      TASK_TYPE: CREATE/RUN_JOB
+  - type: run_job
+    entity_label: fetch_model
+    short_summary: Run the checkpoint download.
+
   # --- the single application: backend + UI in one GPU container -------------
   # serve_app.py runs uvicorn (private :$BACKEND_PORT) and Vite preview (public
   # CDSW_APP_PORT), with Vite proxying /api/* inward. One public port, one app.

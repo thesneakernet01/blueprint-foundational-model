@@ -114,8 +114,8 @@ def _build_inference(emit):
     if not MODEL_DIR.exists():
         raise FileNotFoundError(
             f"decoder-foundation-model checkpoint missing at {MODEL_DIR}. "
-            "In-app embedding generation needs it — set $MODEL_DIR or place the "
-            "checkpoint there (e.g. `git lfs pull`, or download it into ./models)."
+            "In-app embedding generation needs it — run `python scripts/fetch_model.py` "
+            "(or set $MODEL_DIR to an existing checkpoint)."
         )
     from src.tokenizer import FinancialTokenizerPipeline, FinancialTabularTokenizer
     from src.decoder_inference import HuggingFaceDecoderInference

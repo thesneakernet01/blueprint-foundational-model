@@ -8,6 +8,13 @@ venv/
 # Generated demo artifacts (produced by the export; can be large)
 demo_artifacts/
 
+# Foundation-model checkpoint — fetched at deploy time by scripts/fetch_model.py
+# (Git LFS blob from the NVIDIA blueprint, ~56 MB); not committed here.
+models/
+
+# Embeddings cache produced in-app by the export (notebook 04 step)
+data/embeddings/
+
 # Node / frontend build (frontend/ has its own .gitignore too)
 node_modules/
 dist/

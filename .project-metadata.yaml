@@ -110,8 +110,15 @@ tasks:
   # CDSW_APP_PORT), with Vite proxying /api/* inward. One public port, one app.
   - type: start_application
     name: TFM Fraud Demo
+    # A static subdomain must be globally UNIQUE in the workspace, so reusing
+    # `tfm-demo` collides (duplicate key on applications_subdomain_idx) whenever
+    # an app with that name already exists from a prior/failed deploy. Let CML
+    # auto-generate a unique subdomain instead. To pin a stable URL, re-add
+    #   subdomain: tfm-demo
+    #   static_subdomain: true
+    # but only after deleting any existing application using that subdomain.
     subdomain: tfm-demo
-    static_subdomain: true
+    static_subdomain: false
     script: scripts/serve_app.py
     kernel: Python 3.12
     cpu: 2

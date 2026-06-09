@@ -4,6 +4,3 @@ fastapi>=0.110
 uvicorn[standard]>=0.27
 pydantic>=2.5
 joblib>=1.3
-# Run the blueprint's NB01 headlessly for data prep (scripts/prepare_data.py).
-nbclient>=0.9
-nbformat>=5.9

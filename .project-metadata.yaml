@@ -56,6 +56,11 @@ environment_variables:
 # GPU runtime that contains the NVIDIA TFM stack (e.g. the NeMo container
 # registered as a custom ML Runtime) is required for live inference; the stock
 # Nvidia GPU edition below is the closest catalog default.
+#
+# NO SPARK: this demo is GPU/RAPIDS only and must not provision Spark. CML
+# enables Spark solely by attaching a Spark runtime add-on to a task (an
+# `addons:` entry) — so do NOT add one. There are intentionally no `addons:`
+# here, and nothing in the code imports pyspark or opens a SparkSession.
 runtimes:
   - editor: JupyterLab
     kernel: Python 3.12

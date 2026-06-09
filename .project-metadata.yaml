@@ -126,9 +126,10 @@ tasks:
 
   # --- prepare data: download TabFormer + build the temporal splits ----------
   # The dataset isn't in any git repo; prepare_data.py downloads ~2.4 GB from
-  # IBM Box and reproduces NB01's temporal split in chunked pandas (CPU-only,
-  # bounded memory — NB01's cuDF path OOMs a single GPU). Outbound HTTPS needed;
-  # ~15-30 min on first run, then idempotent (skips if the splits exist).
+  # IBM Box and reproduces NB01's temporal split in chunked pandas (bounded
+  # memory). The work is CPU-only, but we request 4 CPU / 16 GB / 1 GPU because
+  # that's a valid CML resource profile that runs cleanly (a no-GPU combo failed
+  # to schedule); the GPU is just along for the profile. ~15-30 min, idempotent.
   - type: create_job
     name: Prepare TabFormer data
     entity_label: prepare_data
@@ -137,7 +138,8 @@ tasks:
     short_summary: Download TabFormer and build the temporal-split parquets.
     kernel: Python 3.12
     cpu: 4
-    memory: 32
+    memory: 16
+    gpu: 1
     environment:
       TASK_TYPE: CREATE/RUN_JOB
   - type: run_job

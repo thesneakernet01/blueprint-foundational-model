@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Offline artifact export — mirrors notebook 05 exactly, then serialises
-everything the live demo needs into `demo_artifacts/`:
+"""Offline artifact export — runs notebook 04 (embeddings) AND notebook 05
+(XGBoost) end-to-end, then serialises everything the live demo needs into
+`demo_artifacts/`:
 
     preprocessor.joblib   sklearn OrdinalEncoder column transformer
     pca.joblib            PCA(512 -> 64)
@@ -10,25 +11,41 @@ everything the live demo needs into `demo_artifacts/`:
     examples.json         real test transactions to click
     summary.json          headline test-set AUC / AP / lift
 
-`run_export()` is importable so the API can run it on the GPU backend and stream
-progress to the UI (see tfm_demo/jobs.py); the root `export_for_demo.py` shim
-runs the same function from the CLI. Requires notebook 04 (embeddings) and the
-temporal parquet splits to exist under the blueprint repo first.
+Embeddings (NB04) are generated in-app by running the decoder foundation model
+over the temporal splits — no separate notebook run is required — and cached to
+`data/embeddings/` so subsequent exports are fast. `run_export()` is importable
+so the API can run it on the GPU backend and stream progress to the UI (see
+tfm_demo/jobs.py); the root `export_for_demo.py` shim runs it from the CLI.
+
+Prerequisites at runtime: the decoder-foundation-model checkpoint (config.MODEL_DIR
+/ $MODEL_DIR), the blueprint's src/, and the temporal parquet splits under
+config.DATA_DIR.
 """
 
 from __future__ import annotations
 
 import json
-from typing import Callable, Dict, Optional
+import os
+from typing import Callable, Dict, Optional, Tuple
 
 import numpy as np
 import joblib
 
 from .config import ARTIFACTS as OUT
-from .config import FRAUD_COL, PCA_DIM, RAW_FEATURE_COLS, REPO_ROOT
+from .config import (
+    DATA_DIR, FRAUD_COL, MAX_LENGTH, MERCHANT_HASH_SIZE, MODEL_DIR, PCA_DIM,
+    RAW_FEATURE_COLS, TOKENIZER_COLS,
+)
 
-EMBED_DIR = REPO_ROOT / "data" / "embeddings"
-TEMPORAL_DIR = REPO_ROOT / "data" / "TabFormer" / "temporal_split"
+EMBED_DIR = DATA_DIR / "embeddings"
+TEMPORAL_DIR = DATA_DIR / "TabFormer" / "temporal_split"
+
+# Per-split row cap for in-app embedding generation, so the UI "Build artifacts"
+# button stays tractable (embedding the full multi-million-row dataset would take
+# hours). Override with $EMBED_MAX_PER_SPLIT; the cached path always uses the
+# rows that were embedded.
+EMBED_MAX = int(os.environ.get("EMBED_MAX_PER_SPLIT", "20000"))
+EMBED_BATCH = int(os.environ.get("EMBED_BATCH", "512"))
 
 # XGBoost params copied verbatim from notebook 05.
 XGB_PARAMS_RAW = dict(n_estimators=400, max_depth=8, learning_rate=0.0023,
@@ -44,16 +61,129 @@ XGB_PARAMS_COMBINED = dict(n_estimators=512, max_depth=12, learning_rate=0.00305
 Progress = Optional[Callable[[str], None]]
 
 
-def run_export(progress: Progress = None) -> Dict:
-    """Train the heads, fit PCA/UMAP, write artifacts, and return the summary.
+# --------------------------------------------------------------------------- #
+# data loading + feature engineering
+# --------------------------------------------------------------------------- #
+def _load_split(name: str):
+    """Read a temporal parquet to pandas; return (tokenizer_input, engineered)."""
+    import cudf
+    pdf = cudf.read_parquet(str(TEMPORAL_DIR / name)).to_pandas()
+    # Tokenizer wants the raw columns (Amount still a "$..." string), captured
+    # before we coerce numerics for the raw-feature head.
+    tok = pdf[TOKENIZER_COLS].copy()
+    pdf = pdf.copy()
+    pdf["Hour"] = pdf["Time"].str.split(":", n=1, expand=True)[0].astype(int)
+    pdf["Amount"] = pdf["Amount"].str.replace("$", "", regex=False)\
+        .str.replace(",", "").astype(float)
+    return tok, pdf
 
-    `progress(msg)` is called with human-readable step messages so the caller
-    (CLI or API) can stream them. Raises on missing prerequisites (e.g. NB04
-    embeddings) — the caller surfaces the error.
+
+def _labels(pdf) -> np.ndarray:
+    m = (pdf[FRAUD_COL] == "Yes") | (pdf[FRAUD_COL].astype(str) == "1")
+    return m.astype(int).to_numpy()
+
+
+def _balanced_train_sel(train_pdf) -> np.ndarray:
+    """NB05's balanced training subsample (~10% fraud), capped at EMBED_MAX."""
+    fraud_mask = (train_pdf[FRAUD_COL] == "Yes") | (train_pdf[FRAUD_COL].astype(str) == "1")
+    fraud_idx = train_pdf.index[fraud_mask].to_numpy()
+    normal_idx = train_pdf.index[~fraud_mask].to_numpy()
+    target = min(EMBED_MAX, len(train_pdf))
+    np.random.seed(42)
+    n_fraud = min(len(fraud_idx), int(target * 0.1))
+    n_normal = min(len(normal_idx), target - n_fraud)
+    sel = np.concatenate([np.random.choice(fraud_idx, n_fraud, replace=False),
+                          np.random.choice(normal_idx, n_normal, replace=False)])
+    np.random.shuffle(sel)
+    return sel
+
+
+def _natural_sel(pdf, seed: int) -> np.ndarray:
+    """Random subsample preserving the natural fraud rate (for val/test eval)."""
+    idx = pdf.index.to_numpy()
+    if len(idx) <= EMBED_MAX:
+        return idx
+    np.random.seed(seed)
+    return np.sort(np.random.choice(idx, EMBED_MAX, replace=False))
+
+
+# --------------------------------------------------------------------------- #
+# embeddings (notebook 04, in-app)
+# --------------------------------------------------------------------------- #
+def _build_inference(emit):
+    if not MODEL_DIR.exists():
+        raise FileNotFoundError(
+            f"decoder-foundation-model checkpoint missing at {MODEL_DIR}. "
+            "In-app embedding generation needs it — set $MODEL_DIR or place the "
+            "checkpoint there (e.g. `git lfs pull`, or download it into ./models)."
+        )
+    from src.tokenizer import FinancialTokenizerPipeline, FinancialTabularTokenizer
+    from src.decoder_inference import HuggingFaceDecoderInference
+    tokenizer = FinancialTabularTokenizer(
+        merchant_hash_size=MERCHANT_HASH_SIZE,
+        category_hierarchy=True, temporal_encoding=True,
+    )
+    inference = HuggingFaceDecoderInference(
+        model_path=MODEL_DIR, tokenizer=tokenizer, pooling="last_token",
+    )
+    emit(f"Loaded foundation model from {MODEL_DIR}")
+    return FinancialTokenizerPipeline, inference
+
+
+def _embed_rows(tok_df, pipeline_cls, inference, emit) -> np.ndarray:
+    """Tokenize a frame of raw transactions and extract last-token embeddings."""
+    import cudf
+    import torch
+
+    gdf = cudf.DataFrame.from_pandas(tok_df[TOKENIZER_COLS].reset_index(drop=True))
+    pip = pipeline_cls(merchant_hash_size=MERCHANT_HASH_SIZE)
+    gdf = pip.preprocess(gdf)
+    pip.fit(gdf)
+    padded = np.asarray(pip.encode(pip.transform(gdf), max_length=MAX_LENGTH))  # (N,128)
+
+    out = []
+    for i in range(0, len(padded), EMBED_BATCH):
+        chunk = torch.from_numpy(padded[i:i + EMBED_BATCH])
+        out.append(inference.extract_embeddings(chunk, return_numpy=True))
+        emit(f"  embeddings {min(i + EMBED_BATCH, len(padded))}/{len(padded)}")
+    return np.vstack(out)
+
+
+def _embeddings(splits, emit) -> Dict[str, Tuple[np.ndarray, np.ndarray, np.ndarray]]:
+    """For each split return (embeddings, labels, selection), cached on disk.
+
+    `splits` maps name -> (tok_df, engineered_pdf, selection_indices).
     """
+    cached = all((EMBED_DIR / f"{s}_embeddings.npy").exists()
+                 and (EMBED_DIR / f"{s}_sel.npy").exists() for s in splits)
+    if cached:
+        emit(f"Using cached embeddings in {EMBED_DIR}")
+        return {s: (np.load(EMBED_DIR / f"{s}_embeddings.npy"),
+                    np.load(EMBED_DIR / f"{s}_labels.npy"),
+                    np.load(EMBED_DIR / f"{s}_sel.npy")) for s in splits}
+
+    emit("Generating embeddings in-app (notebook 04 step) ...")
+    pipeline_cls, inference = _build_inference(emit)
+    EMBED_DIR.mkdir(parents=True, exist_ok=True)
+    result = {}
+    for s, (tok, pdf, sel) in splits.items():
+        emit(f"Embedding {s} ({len(sel)} rows) ...")
+        emb = _embed_rows(tok.loc[sel], pipeline_cls, inference, emit)
+        lab = _labels(pdf.loc[sel])
+        np.save(EMBED_DIR / f"{s}_embeddings.npy", emb)
+        np.save(EMBED_DIR / f"{s}_labels.npy", lab)
+        np.save(EMBED_DIR / f"{s}_sel.npy", np.asarray(sel))
+        result[s] = (emb, lab, np.asarray(sel))
+    return result
+
+
+# --------------------------------------------------------------------------- #
+# the export
+# --------------------------------------------------------------------------- #
+def run_export(progress: Progress = None) -> Dict:
+    """Generate embeddings, train the heads, fit PCA/UMAP, write artifacts."""
     emit = progress or (lambda _m: None)
 
-    import cudf
     import xgboost as xgb
     import torch
     from sklearn.preprocessing import OrdinalEncoder
@@ -62,23 +192,30 @@ def run_export(progress: Progress = None) -> Dict:
     from sklearn.metrics import roc_auc_score, average_precision_score
 
     OUT.mkdir(exist_ok=True)
-    if not EMBED_DIR.exists():
-        raise FileNotFoundError(f"missing {EMBED_DIR} — run notebook 04 first")
+    if not TEMPORAL_DIR.exists():
+        raise FileNotFoundError(
+            f"temporal splits missing at {TEMPORAL_DIR} — set $DATA_DIR or place "
+            "the TabFormer temporal_split parquets there."
+        )
     xgb_device = "cuda" if torch.cuda.is_available() else "cpu"
     emit(f"Compute device: {xgb_device}")
 
-    # ---- embeddings (NB04) ------------------------------------------------
-    emit("Loading embeddings (notebook 04 output) ...")
-    X_train_e = np.load(EMBED_DIR / "train_embeddings.npy")
-    y_train = np.load(EMBED_DIR / "train_labels.npy")
-    train_ids = np.load(EMBED_DIR / "train_row_ids.npy")
-    X_val_e = np.load(EMBED_DIR / "val_embeddings.npy")
-    y_val = np.load(EMBED_DIR / "val_labels.npy")
-    val_ids = np.load(EMBED_DIR / "val_row_ids.npy")
-    X_test_e = np.load(EMBED_DIR / "test_embeddings.npy")
-    y_test = np.load(EMBED_DIR / "test_labels.npy")
-    test_ids = np.load(EMBED_DIR / "test_row_ids.npy")
-    n_train = len(X_train_e)
+    # ---- load splits + choose the rows each split will use ----------------
+    emit("Loading temporal parquets + feature engineering ...")
+    tok_tr, train_pdf = _load_split("train.parquet")
+    tok_va, val_pdf = _load_split("val_eval.parquet")
+    tok_te, test_pdf = _load_split("test_eval.parquet")
+    splits = {
+        "train": (tok_tr, train_pdf, _balanced_train_sel(train_pdf)),
+        "val":   (tok_va, val_pdf, _natural_sel(val_pdf, 7)),
+        "test":  (tok_te, test_pdf, _natural_sel(test_pdf, 11)),
+    }
+
+    # ---- embeddings (NB04, in-app + cached) -------------------------------
+    emb = _embeddings(splits, emit)
+    X_train_e, y_train, sel_tr = emb["train"]
+    X_val_e, y_val, sel_va = emb["val"]
+    X_test_e, y_test, sel_te = emb["test"]
 
     # ---- PCA 512 -> 64 ----------------------------------------------------
     emit(f"PCA {X_train_e.shape[1]}d -> {PCA_DIM}d ...")
@@ -87,30 +224,10 @@ def run_export(progress: Progress = None) -> Dict:
     Xva_pca = pca.transform(X_val_e)
     Xte_pca = pca.transform(X_test_e)
 
-    # ---- raw tabular features (NB05) -------------------------------------
-    emit("Loading temporal parquets + feature engineering ...")
-    train_pdf = cudf.read_parquet(str(TEMPORAL_DIR / "train.parquet")).to_pandas()
-    val_pdf = cudf.read_parquet(str(TEMPORAL_DIR / "val_eval.parquet")).to_pandas()
-    test_pdf = cudf.read_parquet(str(TEMPORAL_DIR / "test_eval.parquet")).to_pandas()
-    for pdf in (train_pdf, val_pdf, test_pdf):
-        pdf["Hour"] = pdf["Time"].str.split(":", n=1, expand=True)[0].astype(int)
-        pdf["Amount"] = pdf["Amount"].str.replace("$", "", regex=False)\
-            .str.replace(",", "").astype(float)
-
-    fraud_mask = (train_pdf[FRAUD_COL] == "Yes") | (train_pdf[FRAUD_COL] == "1")
-    fraud_idx = train_pdf.index[fraud_mask].tolist()
-    normal_idx = train_pdf.index[~fraud_mask].tolist()
-    np.random.seed(42)
-    n_fraud = min(len(fraud_idx), int(n_train * 0.1))
-    n_normal = min(len(normal_idx), n_train - n_fraud)
-    bal = np.concatenate([np.random.choice(fraud_idx, n_fraud, replace=False),
-                          np.random.choice(normal_idx, n_normal, replace=False)])
-    np.random.shuffle(bal)
-
-    X_train_raw = train_pdf.loc[bal, RAW_FEATURE_COLS].reset_index(drop=True)\
-        .iloc[train_ids].reset_index(drop=True)
-    X_val_raw = val_pdf.iloc[val_ids][RAW_FEATURE_COLS].reset_index(drop=True)
-    X_test_raw = test_pdf.iloc[test_ids][RAW_FEATURE_COLS].reset_index(drop=True)
+    # ---- raw tabular features (NB05), aligned to the embedded rows --------
+    X_train_raw = train_pdf.loc[sel_tr, RAW_FEATURE_COLS].reset_index(drop=True)
+    X_val_raw = val_pdf.loc[sel_va, RAW_FEATURE_COLS].reset_index(drop=True)
+    X_test_raw = test_pdf.loc[sel_te, RAW_FEATURE_COLS].reset_index(drop=True)
 
     preproc = make_column_transformer(
         (OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1),
@@ -158,12 +275,13 @@ def run_export(progress: Progress = None) -> Dict:
 
     # ---- real example transactions to click ------------------------------
     examples = []
+    test_raw_reset = test_pdf.loc[sel_te].reset_index(drop=True)
     for want_fraud, label in [(1, "Real fraud (test set)"),
                               (0, "Real legitimate (test set)"),
                               (1, "Real fraud #2 (test set)")]:
         pool = np.where(y_test == want_fraud)[0]
         if len(pool):
-            r = test_pdf.iloc[test_ids[pool[len(pool) // 2]]]
+            r = test_raw_reset.iloc[pool[len(pool) // 2]]
             examples.append({"label": label, "is_fraud": bool(want_fraud), "txn": {
                 "Amount": f"${float(r['Amount']):.2f}", "Merchant Name": str(r["Merchant Name"]),
                 "Merchant City": str(r["Merchant City"]), "Merchant State": str(r["Merchant State"]),

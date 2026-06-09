@@ -15,9 +15,14 @@ import sys
 from pathlib import Path
 
 # ---- paths -----------------------------------------------------------------
-# tfm_demo/ lives inside the demo project root (the `tfm-demo/` folder), which
-# itself sits inside the cloned blueprint repo so we can import its `src/` and
-# load the checkpoint under `models/`.
+# Two supported layouts:
+#   * nested   — tfm_demo/ lives inside the cloned blueprint repo, next to its
+#                src/, models/ and data/ (REPO_ROOT = the blueprint root).
+#   * standalone — the demo is its own project (e.g. a CML AMP installed from a
+#                git URL); src/, models/ and data/ sit INSIDE the project.
+# So we resolve src/model/data against the project first, then the parent repo,
+# and let env vars override outright. (Previously these were hard-wired to the
+# parent, which on CML resolved to /home/… and missed the in-project data.)
 # In a Cloudera notebook/interactive session the module may be exec'd as a cell,
 # where `__file__` is undefined — fall back to the working directory (the project
 # root, by CML convention) in that case.
@@ -27,16 +32,36 @@ except NameError:
     PROJECT_ROOT = Path.cwd()
 REPO_ROOT = PROJECT_ROOT.parent                       # the cloned blueprint repo
 ARTIFACTS = PROJECT_ROOT / "demo_artifacts"
-MODEL_DIR = REPO_ROOT / "models" / "decoder-foundation-model"
+
+
+def _resolve(env_var: str, *candidates: Path) -> Path:
+    """$env_var if set; else the first candidate that exists; else candidate[0]."""
+    override = os.environ.get(env_var)
+    if override:
+        return Path(override).expanduser().resolve()
+    for c in candidates:
+        if c.exists():
+            return c
+    return candidates[0]
+
+
+# $MODEL_DIR / $DATA_DIR override; otherwise prefer in-project, then parent repo.
+MODEL_DIR = _resolve(
+    "MODEL_DIR",
+    PROJECT_ROOT / "models" / "decoder-foundation-model",
+    REPO_ROOT / "models" / "decoder-foundation-model",
+)
+DATA_DIR = _resolve("DATA_DIR", PROJECT_ROOT / "data", REPO_ROOT / "data")
 
 # ---- model dims ------------------------------------------------------------
 MAX_LENGTH = 128
 MERCHANT_HASH_SIZE = 2000
 PCA_DIM = 64
 
-# Make the blueprint's src/ importable.
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
+# Make the blueprint's src/ importable from either layout.
+for _p in (PROJECT_ROOT, REPO_ROOT):
+    if str(_p) not in sys.path:
+        sys.path.insert(0, str(_p))
 
 # ---- column views ----------------------------------------------------------
 # Order matters: the tokenizer and the raw-feature preprocessor were each fit on

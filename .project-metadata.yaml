@@ -124,6 +124,27 @@ tasks:
     entity_label: fetch_model
     short_summary: Run the checkpoint download.
 
+  # --- prepare data: download TabFormer + build the temporal splits ----------
+  # The dataset isn't in any git repo; prepare_data.py runs the blueprint's NB01
+  # headlessly to download ~2.4 GB from IBM Box and write data/TabFormer/
+  # temporal_split/. Needs GPU (cuDF) + outbound HTTPS; ~20-40 min on first run,
+  # then idempotent (skips if the splits already exist).
+  - type: create_job
+    name: Prepare TabFormer data
+    entity_label: prepare_data
+    script: scripts/prepare_data.py
+    arguments: None
+    short_summary: Download TabFormer and build the temporal-split parquets (NB01).
+    kernel: Python 3.12
+    cpu: 4
+    memory: 32
+    gpu: 1
+    environment:
+      TASK_TYPE: CREATE/RUN_JOB
+  - type: run_job
+    entity_label: prepare_data
+    short_summary: Run the data preparation.
+
   # --- the single application: backend + UI in one GPU container -------------
   # serve_app.py runs uvicorn (private :$BACKEND_PORT) and Vite preview (public
   # CDSW_APP_PORT), with Vite proxying /api/* inward. One public port, one app.

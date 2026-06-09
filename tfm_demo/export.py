@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Callable, Dict, Optional, Tuple
+from typing import Callable, Dict, Optional
 
 import numpy as np
 import joblib
@@ -176,32 +176,86 @@ def _embed_rows(tok_df, pipeline_cls, inference, emit) -> np.ndarray:
     return np.vstack(out)
 
 
-def _embeddings(splits, emit) -> Dict[str, Tuple[np.ndarray, np.ndarray, np.ndarray]]:
-    """For each split return (embeddings, labels, selection), cached on disk.
+# split key -> parquet filename / RNG seed for the natural-rate subsample.
+_SPLIT_FILES = {"train": "train.parquet", "val": "val_eval.parquet",
+                "test": "test_eval.parquet"}
+_SPLIT_SEED = {"val": 7, "test": 11}
 
-    `splits` maps name -> (tok_df, engineered_pdf, selection_indices).
+
+def _meminfo() -> str:
+    """Host RSS + GPU used/total, for per-stage memory logging."""
+    parts = []
+    try:
+        with open("/proc/self/status") as f:
+            for line in f:
+                if line.startswith("VmRSS:"):
+                    parts.append("host RSS " + line.split(":", 1)[1].strip())
+                    break
+    except Exception:                                              # noqa: BLE001
+        pass
+    try:
+        import torch
+        if torch.cuda.is_available():
+            free, total = torch.cuda.mem_get_info()
+            parts.append(f"GPU {(total - free) / 1e9:.1f}/{total / 1e9:.1f} GB")
+    except Exception:                                              # noqa: BLE001
+        pass
+    return " · ".join(parts) or "mem n/a"
+
+
+def _all_cached() -> bool:
+    return all((EMBED_DIR / f"{s}_embeddings.npy").exists()
+               and (EMBED_DIR / f"{s}_labels.npy").exists()
+               and (EMBED_DIR / f"{s}_sel.npy").exists()
+               for s in _SPLIT_FILES)
+
+
+def _process_split(name, pipeline_cls, inference, emit) -> Dict:
+    """Load ONE split, pick its rows, embed them, and return only small host
+    arrays — freeing the full GPU frame before the next split. Peak memory is one
+    split, not three (the old code held train+val+test resident at once, which
+    OOM-killed the build). Embeddings cache to disk; raw features are re-derived
+    from the cheaply re-read selection each run.
+
+    Returns {emb (N,512), y (N,), sel (N,), raw (pandas N×RAW_FEATURE_COLS),
+    rows (pandas full selected rows for the test split's examples, else None)}.
     """
-    cached = all((EMBED_DIR / f"{s}_embeddings.npy").exists()
-                 and (EMBED_DIR / f"{s}_sel.npy").exists() for s in splits)
-    if cached:
-        emit(f"Using cached embeddings in {EMBED_DIR}")
-        return {s: (np.load(EMBED_DIR / f"{s}_embeddings.npy"),
-                    np.load(EMBED_DIR / f"{s}_labels.npy"),
-                    np.load(EMBED_DIR / f"{s}_sel.npy")) for s in splits}
+    emb_p = EMBED_DIR / f"{name}_embeddings.npy"
+    lab_p = EMBED_DIR / f"{name}_labels.npy"
+    sel_p = EMBED_DIR / f"{name}_sel.npy"
+    cached = emb_p.exists() and lab_p.exists() and sel_p.exists()
 
-    emit("Generating embeddings in-app (notebook 04 step) ...")
-    pipeline_cls, inference = _build_inference(emit)
-    EMBED_DIR.mkdir(parents=True, exist_ok=True)
-    result = {}
-    for s, (tok, pdf, sel) in splits.items():
-        emit(f"Embedding {s} ({len(sel)} rows) ...")
-        emb = _embed_rows(tok.loc[sel], pipeline_cls, inference, emit)
-        lab = _labels(pdf.loc[sel])
-        np.save(EMBED_DIR / f"{s}_embeddings.npy", emb)
-        np.save(EMBED_DIR / f"{s}_labels.npy", lab)
-        np.save(EMBED_DIR / f"{s}_sel.npy", np.asarray(sel))
-        result[s] = (emb, lab, np.asarray(sel))
-    return result
+    emit(f"Loading {name} split ...")
+    tok, df = _load_split(_SPLIT_FILES[name])
+    emit(f"  {name}: {len(df):,} rows loaded  [{_meminfo()}]")
+
+    if cached:
+        sel = np.load(sel_p)
+    elif name == "train":
+        sel = _balanced_train_sel(df)
+    else:
+        sel = _natural_sel(df, _SPLIT_SEED[name])
+
+    # Slice to the selected rows, then drop the full GPU frames immediately so the
+    # forward pass runs with only the subset + model resident.
+    tok_sel = tok.loc[sel].reset_index(drop=True)
+    df_sel = df.loc[sel].reset_index(drop=True)
+    del tok, df
+
+    if cached:
+        emit(f"  using cached embeddings for {name}")
+        emb, lab = np.load(emb_p), np.load(lab_p)
+    else:
+        emit(f"Embedding {name} ({len(sel):,} rows) ...  [{_meminfo()}]")
+        emb = _embed_rows(tok_sel, pipeline_cls, inference, emit)
+        lab = _labels(df_sel)
+        np.save(emb_p, emb)
+        np.save(lab_p, lab)
+        np.save(sel_p, np.asarray(sel))
+
+    raw = df_sel[RAW_FEATURE_COLS].to_pandas()
+    rows = df_sel.to_pandas() if name == "test" else None
+    return {"emb": emb, "y": lab, "sel": np.asarray(sel), "raw": raw, "rows": rows}
 
 
 # --------------------------------------------------------------------------- #
@@ -227,22 +281,19 @@ def run_export(progress: Progress = None) -> Dict:
     xgb_device = "cuda" if torch.cuda.is_available() else "cpu"
     emit(f"Compute device: {xgb_device}")
 
-    # ---- load splits + choose the rows each split will use ----------------
-    emit("Loading temporal parquets + feature engineering ...")
-    tok_tr, train_pdf = _load_split("train.parquet")
-    tok_va, val_pdf = _load_split("val_eval.parquet")
-    tok_te, test_pdf = _load_split("test_eval.parquet")
-    splits = {
-        "train": (tok_tr, train_pdf, _balanced_train_sel(train_pdf)),
-        "val":   (tok_va, val_pdf, _natural_sel(val_pdf, 7)),
-        "test":  (tok_te, test_pdf, _natural_sel(test_pdf, 11)),
-    }
+    # ---- per split: load -> select -> embed -> free (peak = ONE split) ----
+    # The model is loaded once, only if some split still needs embedding.
+    EMBED_DIR.mkdir(parents=True, exist_ok=True)
+    pipeline_cls = inference = None
+    if not _all_cached():
+        emit("Generating embeddings in-app (notebook 04 step) ...")
+        pipeline_cls, inference = _build_inference(emit)
 
-    # ---- embeddings (NB04, in-app + cached) -------------------------------
-    emb = _embeddings(splits, emit)
-    X_train_e, y_train, sel_tr = emb["train"]
-    X_val_e, y_val, sel_va = emb["val"]
-    X_test_e, y_test, sel_te = emb["test"]
+    parts = {name: _process_split(name, pipeline_cls, inference, emit)
+             for name in ("train", "val", "test")}
+    X_train_e, y_train, sel_tr = parts["train"]["emb"], parts["train"]["y"], parts["train"]["sel"]
+    X_val_e, y_val, sel_va = parts["val"]["emb"], parts["val"]["y"], parts["val"]["sel"]
+    X_test_e, y_test, sel_te = parts["test"]["emb"], parts["test"]["y"], parts["test"]["sel"]
 
     # ---- PCA 512 -> 64 ----------------------------------------------------
     emit(f"PCA {X_train_e.shape[1]}d -> {PCA_DIM}d ...")
@@ -252,10 +303,10 @@ def run_export(progress: Progress = None) -> Dict:
     Xte_pca = pca.transform(X_test_e)
 
     # ---- raw tabular features (NB05), aligned to the embedded rows --------
-    # Copy only the selected rows (~EMBED_MAX) to host pandas for sklearn.
-    X_train_raw = train_pdf.loc[sel_tr, RAW_FEATURE_COLS].reset_index(drop=True).to_pandas()
-    X_val_raw = val_pdf.loc[sel_va, RAW_FEATURE_COLS].reset_index(drop=True).to_pandas()
-    X_test_raw = test_pdf.loc[sel_te, RAW_FEATURE_COLS].reset_index(drop=True).to_pandas()
+    # Already host pandas, restricted to the ~EMBED_MAX selected rows per split.
+    X_train_raw = parts["train"]["raw"]
+    X_val_raw = parts["val"]["raw"]
+    X_test_raw = parts["test"]["raw"]
 
     preproc = make_column_transformer(
         (OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1),
@@ -303,8 +354,8 @@ def run_export(progress: Progress = None) -> Dict:
 
     # ---- real example transactions to click ------------------------------
     examples = []
-    # Selected test rows to host pandas for per-row .iloc element access.
-    test_raw_reset = test_pdf.loc[sel_te].reset_index(drop=True).to_pandas()
+    # The test split's selected rows (host pandas) for per-row .iloc access.
+    test_raw_reset = parts["test"]["rows"]
     for want_fraud, label in [(1, "Real fraud (test set)"),
                               (0, "Real legitimate (test set)"),
                               (1, "Real fraud #2 (test set)")]:

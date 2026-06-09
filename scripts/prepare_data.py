@@ -124,6 +124,23 @@ def _date_int(df):
     return df["Year"].astype(int) * 10000 + df["Month"].astype(int) * 100 + df["Day"].astype(int)
 
 
+def _diag(tag: str) -> None:
+    """Print peak RSS + free disk so the job log reveals resource pressure."""
+    bits = [f"prepare_data[{tag}]"]
+    try:
+        import resource  # ru_maxrss is KiB on Linux
+        bits.append(f"rss={resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1e6:.1f}GB")
+    except Exception:  # noqa: BLE001
+        pass
+    for name, p in (("scratch", SCRATCH), ("data", DATA_DIR)):
+        try:
+            target = p if p.exists() else p.parent
+            bits.append(f"{name}_free={shutil.disk_usage(target).free / 1e9:.1f}GB")
+        except Exception:  # noqa: BLE001
+            pass
+    print("  " + " · ".join(bits), flush=True)
+
+
 def main() -> None:
     if all((TEMPORAL_DIR / f).exists() for f in REQUIRED):
         print(f"prepare_data: temporal splits already present in {TEMPORAL_DIR}")
@@ -136,8 +153,10 @@ def main() -> None:
     date_actual = _actual_cols(pd, DATE_COLS)
     use_actual = _actual_cols(pd, USECOLS)
 
+    _diag("after download")
+
     # ---- pass 1: per-date row counts -> temporal cutoffs ------------------
-    print("prepare_data: scanning dates for temporal cutoffs ...")
+    print("prepare_data: scanning dates for temporal cutoffs ...", flush=True)
     counts: Counter = Counter()
     for chunk in _read_chunks(pd, date_actual, DATE_COLS):
         for d, c in _date_int(chunk).value_counts().items():
@@ -153,38 +172,39 @@ def main() -> None:
             test_cut = d
             break
     train_total = sum(c for d, c in counts.items() if d < train_cut)
-    keep_p = min(1.0, TRAIN_CAP / max(1, train_total))
+    val_total = sum(c for d, c in counts.items() if train_cut <= d < test_cut)
+    test_total = sum(c for d, c in counts.items() if d >= test_cut)
+    # train: keep ALL fraud + subsample normals to the cap; val/test: random
+    # subsample to ~EVAL_SAMPLES (preserves the natural fraud rate for eval).
+    keep_norm = min(1.0, TRAIN_CAP / max(1, train_total))
+    keep_val = min(1.0, EVAL_SAMPLES / max(1, val_total))
+    keep_test = min(1.0, EVAL_SAMPLES / max(1, test_total))
     print(f"prepare_data: {total:,} rows · cutoffs {train_cut}/{test_cut} · "
-          f"train≈{train_total:,} (keep {keep_p:.3f})")
+          f"keep norm={keep_norm:.3f} val={keep_val:.3f} test={keep_test:.3f}", flush=True)
 
-    # ---- pass 2: split, cap train, collect val/test -----------------------
+    # ---- pass 2: split + subsample in-stream (bounded memory) -------------
     rng = np.random.default_rng(SEED)
     train_parts, val_parts, test_parts = [], [], []
+
+    def _is_fraud(df):
+        return df["Is Fraud?"].astype(str).str.lower().eq("yes")
+
+    def _sub(df, p):
+        return df if p >= 1.0 or not len(df) else df[rng.random(len(df)) < p]
+
     for chunk in _read_chunks(pd, use_actual, USECOLS):
         di = _date_int(chunk)
         tr = chunk[di < train_cut]
-        if keep_p < 1.0 and len(tr):
-            tr = tr[rng.random(len(tr)) < keep_p]
-        train_parts.append(tr)
-        val_parts.append(chunk[(di >= train_cut) & (di < test_cut)])
-        test_parts.append(chunk[di >= test_cut])
+        if len(tr):
+            f = _is_fraud(tr)
+            train_parts.append(pd.concat([tr[f], _sub(tr[~f], keep_norm)]))
+        val_parts.append(_sub(chunk[(di >= train_cut) & (di < test_cut)], keep_val))
+        test_parts.append(_sub(chunk[di >= test_cut], keep_test))
 
     train_df = pd.concat(train_parts, ignore_index=True); del train_parts
-    val_df = pd.concat(val_parts, ignore_index=True); del val_parts
-    test_df = pd.concat(test_parts, ignore_index=True); del test_parts
-
-    def stratified(df, n):
-        if n >= len(df):
-            return df.reset_index(drop=True)
-        is_fraud = df["Is Fraud?"].astype(str).str.lower().eq("yes")
-        frac = n / len(df)
-        return pd.concat([
-            df[is_fraud].sample(frac=frac, random_state=SEED),
-            df[~is_fraud].sample(frac=frac, random_state=SEED),
-        ]).sample(frac=1, random_state=SEED).reset_index(drop=True)
-
-    val_eval = stratified(val_df, EVAL_SAMPLES)
-    test_eval = stratified(test_df, EVAL_SAMPLES)
+    val_eval = pd.concat(val_parts, ignore_index=True); del val_parts
+    test_eval = pd.concat(test_parts, ignore_index=True); del test_parts
+    _diag("after split")
 
     TEMPORAL_DIR.mkdir(parents=True, exist_ok=True)
     train_df.to_parquet(TEMPORAL_DIR / "train.parquet", index=False)
@@ -196,10 +216,17 @@ def main() -> None:
 
     print(f"prepare_data: wrote train={len(train_df):,} ({rate(train_df):.3f}% fraud)  "
           f"val_eval={len(val_eval):,} ({rate(val_eval):.3f}%)  "
-          f"test_eval={len(test_eval):,} ({rate(test_eval):.3f}%) -> {TEMPORAL_DIR}")
+          f"test_eval={len(test_eval):,} ({rate(test_eval):.3f}%) -> {TEMPORAL_DIR}", flush=True)
 
     shutil.rmtree(SCRATCH, ignore_errors=True)            # drop the big CSV/scratch
 
 
 if __name__ == "__main__":
-    main()
+    import traceback
+    try:
+        main()
+    except Exception:                                     # surface the real error
+        traceback.print_exc()
+        sys.stdout.flush()
+        sys.stderr.flush()
+        raise

@@ -133,7 +133,8 @@ export default function ExportDialog({ open, onClose, onExported }: Props) {
           <p className="text-xs text-gray-400 leading-relaxed">
             Trains the three XGBoost heads, fits PCA + UMAP on the foundation-model
             embeddings, and writes <span className="font-mono text-gray-300">demo_artifacts/</span> on
-            the backend. Requires notebook 04 outputs and a GPU. When it finishes, the metrics,
+            the backend. Generates the foundation-model embeddings in-app — requires the model
+            checkpoint, the temporal data splits, and a GPU. When it finishes, the metrics,
             examples, and embedding map below refresh automatically.
           </p>
 

@@ -9,11 +9,29 @@ without a server restart.
 
 from __future__ import annotations
 
+import math
 import threading
 import time
 from typing import Dict, List, Optional
 
 from .config import log
+
+
+def _jsonsafe(obj):
+    """Coerce a value tree into something Starlette's JSONResponse (allow_nan=
+    False) can serialise: numpy scalars -> python, NaN/Inf -> None. Without this
+    a single NaN/Inf or numpy float32/int from a build result 500s the status
+    poll, leaving the UI stuck on the build dialog (see export summary `lift`)."""
+    if isinstance(obj, dict):
+        return {k: _jsonsafe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_jsonsafe(v) for v in obj]
+    item = getattr(obj, "item", None)            # numpy scalar -> python scalar
+    if callable(item) and getattr(obj, "ndim", None) == 0:
+        obj = obj.item()
+    if isinstance(obj, float) and not math.isfinite(obj):
+        return None                              # NaN / +-Inf are not JSON-compliant
+    return obj
 
 
 class ExportManager:
@@ -70,11 +88,11 @@ class ExportManager:
         if self.started_at is not None:
             end = self.finished_at or time.time()
             elapsed = round(end - self.started_at, 1)
-        return {
+        return _jsonsafe({
             "state": self.state,
-            "log": self.log,
+            "log": list(self.log),               # snapshot: the export thread mutates this
             "summary": self.summary,
             "error": self.error,
             "elapsed_sec": elapsed,
             "engine_mode": self.engine.mode,
-        }
+        })

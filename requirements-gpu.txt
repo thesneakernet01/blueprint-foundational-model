@@ -5,8 +5,11 @@
 #   - xgboost + scikit-learn: the three fraud heads and the preprocessing/PCA
 # Installed by scripts/install_deps.py alongside requirements-demo.txt.
 #
-# RAPIDS and some CUDA wheels live on NVIDIA's index, not PyPI:
+# RAPIDS and some CUDA wheels live on NVIDIA's index, not PyPI; torch's CUDA 12
+# build lives on PyTorch's own index. (Unqualified `torch` on PyPI now pulls a
+# CUDA 13 build, which mismatches the cu12 RAPIDS stack and the CUDA 12 driver.)
 --extra-index-url https://pypi.nvidia.com
+--extra-index-url https://download.pytorch.org/whl/cu121
 
 # RAPIDS — cu12 wheels bundle their own CUDA 12 runtime and only need a CUDA 12
 # driver, which the runtime already provides. Keep cudf and cuml versions in
@@ -15,8 +18,10 @@ cudf-cu12==24.12.*
 cuml-cu12==24.12.*
 cupy-cuda12x
 
-# Decoder foundation model + tokenizer.
-torch
+# Decoder foundation model + tokenizer. The +cu121 local version forces the
+# CUDA 12 wheel from the PyTorch index (and so can't be satisfied by a PyPI
+# cu13 build). cu121 wheels run on any CUDA 12.x driver; cp312 wheels exist.
+torch==2.5.1+cu121
 transformers
 accelerate
 safetensors

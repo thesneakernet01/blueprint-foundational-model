@@ -58,7 +58,7 @@ environment_variables:
 # Nvidia GPU edition below is the closest catalog default.
 runtimes:
   - editor: JupyterLab
-    kernel: Python 3.10
+    kernel: Python 3.12
     edition: Nvidia GPU
 
 tasks:
@@ -71,7 +71,7 @@ tasks:
     script: scripts/install_deps.py
     arguments: None
     short_summary: Install the web layer + the NVIDIA/GPU Python stack (CUDA assumed present).
-    kernel: Python 3.10
+    kernel: Python 3.12
     cpu: 2
     memory: 8
     gpu: 1
@@ -91,7 +91,7 @@ tasks:
     script: scripts/build_frontend.py
     arguments: None
     short_summary: Install Node user-locally and build the React SPA bundle.
-    kernel: Python 3.10
+    kernel: Python 3.12
     cpu: 2
     memory: 4
     environment:
@@ -108,7 +108,7 @@ tasks:
     subdomain: tfm-demo
     static_subdomain: true
     script: scripts/serve_app.py
-    kernel: Python 3.10
+    kernel: Python 3.12
     cpu: 2
     memory: 16
     gpu: 1

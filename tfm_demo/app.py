@@ -5,9 +5,18 @@ lives in `Engine` (engine.py); this module is just the HTTP surface.
 
 from __future__ import annotations
 
+import faulthandler
+import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+
+# The GPU stack (RAPIDS/numba/torch) can die with a native signal (SIGSEGV/
+# SIGABRT) that produces no Python traceback — the backend just vanishes with
+# e.g. exit -11 and the export log goes silent. faulthandler prints every
+# thread's Python stack to stderr on those signals, so the CML app log shows
+# exactly which line was executing.
+faulthandler.enable(file=sys.stderr, all_threads=True)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 

@@ -239,17 +239,20 @@ def _process_split(name, pipeline_cls, inference, emit) -> Dict:
         sel = _balanced_train_sel(df)
     else:
         sel = _natural_sel(df, _SPLIT_SEED[name])
+    emit(f"  {name}: selected {len(sel):,} rows; slicing ...  [{_meminfo()}]")
 
     # Slice to the selected rows and drop the full GPU frame immediately, THEN
     # engineer features — only the ~EMBED_MAX-row subset ever gets the string-op
     # temporaries, and the forward pass runs with just the subset + model resident.
     sub = df.loc[sel].reset_index(drop=True)
     del df
+    emit(f"  {name}: engineering features ...  [{_meminfo()}]")
     # Tokenizer wants the raw columns (Amount still a "$..." string), captured
     # before we coerce numerics for the raw-feature head.
     tok_sel = sub[TOKENIZER_COLS].copy()
     df_sel = _engineer(sub)
     del sub
+    emit(f"  {name}: features ready  [{_meminfo()}]")
 
     if cached:
         emit(f"  using cached embeddings for {name}")

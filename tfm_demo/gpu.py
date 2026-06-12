@@ -35,9 +35,16 @@ def configure_gpu_memory() -> None:
         return
     _configured = True
 
+    # Each knob is individually defeatable (set to 0) so a native crash can be
+    # bisected from the CML application's environment without a code change.
+    use_pool = os.environ.get("DEMO_RMM_POOL", "1") != "0"
+    use_spill = os.environ.get("DEMO_CUDF_SPILL", "1") != "0"
+    use_expandable = os.environ.get("DEMO_TORCH_EXPANDABLE", "1") != "0"
+
     # torch reads this when its CUDA caching allocator initialises (first
     # allocation), so a setdefault here is early enough in practice.
-    os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+    if use_expandable:
+        os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
     try:
         import cudf
@@ -47,15 +54,18 @@ def configure_gpu_memory() -> None:
         return
 
     try:
-        pool = int(os.environ.get("RMM_INITIAL_POOL_BYTES", str(2**30)))
-        rmm.reinitialize(pool_allocator=True, initial_pool_size=pool)
-        cudf.set_option("spill", True)
-        try:
-            import cupy
-            from rmm.allocators.cupy import rmm_cupy_allocator
-            cupy.cuda.set_allocator(rmm_cupy_allocator)
-        except Exception:                                          # noqa: BLE001
-            pass                                # CuPy keeps its own pool; non-fatal
-        log.info("RMM pool (%d MiB initial) + cuDF spill enabled", pool // 2**20)
+        if use_pool:
+            pool = int(os.environ.get("RMM_INITIAL_POOL_BYTES", str(2**30)))
+            rmm.reinitialize(pool_allocator=True, initial_pool_size=pool)
+            try:
+                import cupy
+                from rmm.allocators.cupy import rmm_cupy_allocator
+                cupy.cuda.set_allocator(rmm_cupy_allocator)
+            except Exception:                                      # noqa: BLE001
+                pass                            # CuPy keeps its own pool; non-fatal
+        if use_spill:
+            cudf.set_option("spill", True)
+        log.info("GPU memory config: pool=%s spill=%s torch_expandable=%s",
+                 use_pool, use_spill, use_expandable)
     except Exception as exc:                                       # noqa: BLE001
         log.warning("GPU memory config failed (continuing on defaults): %s", exc)

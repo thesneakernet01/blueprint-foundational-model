@@ -135,6 +135,20 @@ class Engine:
         if row.get("Hour") in (None, ""):
             t = str(txn.get("Time", "0:00"))
             row["Hour"] = int(t.split(":")[0]) if ":" in t else 0
+        # The preprocessor was fitted on TabFormer dtypes, where "Merchant Name"
+        # is a hashed int64 and "Zip" a float64 — passthrough numerics, not
+        # OrdinalEncoder columns. A string here (the UI posts e.g. "AMAZON")
+        # makes the feature matrix object-dtype and XGBoost's float coercion
+        # 500s. Map non-numeric merchants to -1.0 (an unseen hash, mirroring
+        # the encoder's unknown_value=-1 convention).
+        try:
+            row["Merchant Name"] = float(str(row.get("Merchant Name", "")).strip())
+        except ValueError:
+            row["Merchant Name"] = -1.0
+        try:
+            row["Zip"] = float(str(row.get("Zip", "")).strip() or 0)
+        except ValueError:
+            row["Zip"] = 0.0
         df = pd.DataFrame([row], columns=RAW_FEATURE_COLS)
         return self._preproc.transform(df)
 

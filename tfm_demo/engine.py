@@ -114,6 +114,17 @@ class Engine:
         """raw transaction dict -> (512-d embedding np.array, token strings)."""
         import cudf
 
+        txn = dict(txn)
+        # In the dataset a missing Zip is a real null, which the blueprint's
+        # preprocess fillna()s before its zip3 astype(int). But examples.json
+        # serialises it as the string "nan" (str() of a float NaN), and users
+        # can type anything — non-digit strings crash the int cast in cuDF.
+        # Normalise to the fillna value. (The raw-feature path is left alone:
+        # there "nan" coerces to float NaN, matching training.)
+        z = str(txn.get("Zip", "")).strip()
+        z = z[:-2] if z.endswith(".0") else z
+        txn["Zip"] = z if z.isdigit() else "00000"
+
         gdf = cudf.DataFrame({c: [txn.get(c)] for c in TOKENIZER_COLS})
         pip = self._pipeline_cls(merchant_hash_size=MERCHANT_HASH_SIZE)
         gdf = pip.preprocess(gdf)

@@ -77,6 +77,8 @@ def configure_gpu_memory() -> None:
         log.info("GPU memory config skipped (no RAPIDS stack): %s", exc)
         return
 
+    _patch_cudf_compat(cudf)
+
     try:
         if use_pool:
             pool = int(os.environ.get("RMM_INITIAL_POOL_BYTES", str(2**30)))
@@ -93,6 +95,23 @@ def configure_gpu_memory() -> None:
                  use_pool, use_spill, use_expandable)
     except Exception as exc:                                       # noqa: BLE001
         log.warning("GPU memory config failed (continuing on defaults): %s", exc)
+
+
+def _patch_cudf_compat(cudf) -> None:
+    """Shim cuDF APIs the blueprint uses but cudf 24.12 lacks, so the fetched
+    `src/` stays verbatim. Currently: TimedeltaProperties.total_seconds()
+    (added in cudf 25.02; the tokenizer's financial_pipeline.py calls it to
+    derive time_delta_s). No-op once the real method exists."""
+    props = cudf.core.series.TimedeltaProperties
+    if hasattr(props, "total_seconds"):
+        return
+
+    def total_seconds(self):
+        # int64 nanosecond ticks -> float seconds; nulls survive both casts.
+        return self.series.astype("timedelta64[ns]").astype("int64") / 1e9
+
+    props.total_seconds = total_seconds
+    log.info("cuDF compat: shimmed TimedeltaProperties.total_seconds()")
 
 
 def gpu_stack_versions() -> str:

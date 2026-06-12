@@ -73,8 +73,8 @@ _SOURCE_COLS = list(dict.fromkeys(
 
 
 def _load_split(name: str):
-    """Read a temporal parquet into a cuDF frame on the GPU and engineer features
-    there; return (tokenizer_input, engineered) as cuDF frames.
+    """Read a temporal parquet into a cuDF frame on the GPU — raw columns only,
+    no feature engineering yet.
 
     The whole split (up to PREP_TRAIN_CAP rows) stays on the GPU — only the
     ~EMBED_MAX-row selections are later copied to host (see run_export). The old
@@ -84,15 +84,19 @@ def _load_split(name: str):
     frames in cuDF fixes that and keeps the pipeline GPU-native (RAPIDS).
     """
     import cudf
-    gdf = cudf.read_parquet(str(TEMPORAL_DIR / name), columns=_SOURCE_COLS)
-    # Tokenizer wants the raw columns (Amount still a "$..." string), captured
-    # before we coerce numerics for the raw-feature head.
-    tok = gdf[TOKENIZER_COLS].copy()
+    return cudf.read_parquet(str(TEMPORAL_DIR / name), columns=_SOURCE_COLS)
+
+
+def _engineer(gdf):
+    """NB05 numeric coercions (Hour from Time, Amount "$…" -> float), on a cuDF
+    frame. Run this on the ~EMBED_MAX-row selection, never the full split — the
+    string ops materialise full-size temporaries, which is what blew past the
+    GPU budget on 48 GB cards (L40S) when done before selection."""
     gdf = gdf.copy()
     gdf["Hour"] = gdf["Time"].str.split(":", n=1, expand=True)[0].astype("int32")
     gdf["Amount"] = (gdf["Amount"].str.replace("$", "", regex=False)
                      .str.replace(",", "").astype("float64"))
-    return tok, gdf
+    return gdf
 
 
 def _labels(df) -> np.ndarray:
@@ -226,7 +230,7 @@ def _process_split(name, pipeline_cls, inference, emit) -> Dict:
     cached = emb_p.exists() and lab_p.exists() and sel_p.exists()
 
     emit(f"Loading {name} split ...")
-    tok, df = _load_split(_SPLIT_FILES[name])
+    df = _load_split(_SPLIT_FILES[name])
     emit(f"  {name}: {len(df):,} rows loaded  [{_meminfo()}]")
 
     if cached:
@@ -236,11 +240,16 @@ def _process_split(name, pipeline_cls, inference, emit) -> Dict:
     else:
         sel = _natural_sel(df, _SPLIT_SEED[name])
 
-    # Slice to the selected rows, then drop the full GPU frames immediately so the
-    # forward pass runs with only the subset + model resident.
-    tok_sel = tok.loc[sel].reset_index(drop=True)
-    df_sel = df.loc[sel].reset_index(drop=True)
-    del tok, df
+    # Slice to the selected rows and drop the full GPU frame immediately, THEN
+    # engineer features — only the ~EMBED_MAX-row subset ever gets the string-op
+    # temporaries, and the forward pass runs with just the subset + model resident.
+    sub = df.loc[sel].reset_index(drop=True)
+    del df
+    # Tokenizer wants the raw columns (Amount still a "$..." string), captured
+    # before we coerce numerics for the raw-feature head.
+    tok_sel = sub[TOKENIZER_COLS].copy()
+    df_sel = _engineer(sub)
+    del sub
 
     if cached:
         emit(f"  using cached embeddings for {name}")
@@ -265,12 +274,22 @@ def run_export(progress: Progress = None) -> Dict:
     """Generate embeddings, train the heads, fit PCA/UMAP, write artifacts."""
     emit = progress or (lambda _m: None)
 
+    from .gpu import configure_gpu_memory
+    configure_gpu_memory()                 # RMM pool + cuDF spill, before any cuDF use
+
     import xgboost as xgb
     import torch
     from sklearn.preprocessing import OrdinalEncoder
     from sklearn.compose import make_column_transformer, make_column_selector
     from sklearn.decomposition import PCA
     from sklearn.metrics import roc_auc_score, average_precision_score
+
+    # Best-effort: have XGBoost allocate from the shared RMM pool instead of
+    # carving its own arena (only takes effect on RMM-enabled builds).
+    try:
+        xgb.set_config(use_rmm=True)
+    except Exception:                                              # noqa: BLE001
+        pass
 
     OUT.mkdir(exist_ok=True)
     if not TEMPORAL_DIR.exists():

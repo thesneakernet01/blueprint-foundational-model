@@ -73,6 +73,9 @@ class Engine:
             self.summary = builtin_summary()
 
     def _load_real_stack(self) -> None:
+        from .gpu import configure_gpu_memory
+        configure_gpu_memory()      # RMM pool + cuDF spill — must precede cuDF/cuML use
+
         import torch
         import joblib
 

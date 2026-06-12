@@ -18,6 +18,17 @@ cudf-cu12==24.12.*
 cuml-cu12==24.12.*
 cupy-cuda12x
 
+# RAPIDS' numba / CUDA-binding companions, pinned to cudf 24.12's tested matrix
+# (cudf-cu12 24.12 declares numba-cuda>=0.0.13,<0.0.18 and cuda-python<=12.6).
+# numba.cuda is redirected to the numba-cuda package via a .pth hook, so when a
+# later unpinned install drifts these forward, EVERY cuDF host copy
+# (.to_numpy()/.values) segfaults inside the numba CUDA driver shim — seen live
+# as SIGSEGV in export.py _labels via column.data_array_view. Explicit pins make
+# install re-runs converge instead of drifting.
+numba-cuda==0.0.17
+numba==0.60.*
+cuda-python==12.6.*
+
 # Decoder foundation model + tokenizer. The +cu121 local version forces the
 # CUDA 12 wheel from the PyTorch index (and so can't be satisfied by a PyPI
 # cu13 build). cu121 wheels run on any CUDA 12.x driver; cp312 wheels exist.

@@ -101,8 +101,13 @@ def _engineer(gdf):
 
 def _labels(df) -> np.ndarray:
     """Binary fraud labels as a host numpy array (works on cuDF or pandas)."""
-    m = (df[FRAUD_COL] == "Yes") | (df[FRAUD_COL].astype(str) == "1")
-    return np.asarray(m.astype("int32").to_numpy())
+    m = ((df[FRAUD_COL] == "Yes") | (df[FRAUD_COL].astype(str) == "1")).astype("int32")
+    # cuDF's .to_numpy() copies device->host through numba.cuda's array view —
+    # the exact path that segfaulted under a drifted numba-cuda (see
+    # requirements-gpu.txt). The Arrow-based to_pandas() copy avoids numba.
+    if hasattr(m, "to_pandas"):
+        m = m.to_pandas()
+    return np.asarray(m.to_numpy())
 
 
 def _balanced_train_sel(train_df) -> np.ndarray:

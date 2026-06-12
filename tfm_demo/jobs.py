@@ -15,6 +15,7 @@ import time
 from typing import Dict, List, Optional
 
 from .config import log
+from .resources import sample as sample_resources
 
 
 def _jsonsafe(obj):
@@ -95,4 +96,7 @@ class ExportManager:
             "error": self.error,
             "elapsed_sec": elapsed,
             "engine_mode": self.engine.mode,
+            # Live CPU/RAM/GPU snapshot so the build dialog can show meters
+            # while the export runs (the UI polls this endpoint anyway).
+            "resources": sample_resources(),
         })

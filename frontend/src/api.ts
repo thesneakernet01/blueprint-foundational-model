@@ -106,6 +106,18 @@ export async function postScore(txn: TxnPayload): Promise<ScoreResp> {
 
 export type ExportState = 'idle' | 'running' | 'done' | 'error';
 
+/** Live backend resource snapshot piggybacked on the export-status poll.
+ *  Any field is null when that probe is unavailable (no GPU, no cgroups). */
+export interface ResourceSample {
+  cpu_pct: number | null;
+  ram_used_gb: number | null;
+  ram_total_gb: number | null;
+  gpu_name: string | null;
+  gpu_util_pct: number | null;
+  gpu_mem_used_gb: number | null;
+  gpu_mem_total_gb: number | null;
+}
+
 export interface ExportStatus {
   state: ExportState;
   log: string[];
@@ -113,6 +125,7 @@ export interface ExportStatus {
   error: string | null;
   elapsed_sec: number | null;
   engine_mode: Mode;
+  resources?: ResourceSample | null;
 }
 
 /** Kick off an export. `started` is false (HTTP 409) if one is already running. */

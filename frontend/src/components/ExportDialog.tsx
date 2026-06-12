@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertCircle, CheckCircle, Loader2, Play, X } from 'lucide-react';
-import { getExportStatus, startExport, type ExportState, type ExportStatus } from '../api';
+import { Activity, AlertCircle, CheckCircle, Loader2, Play, X } from 'lucide-react';
+import {
+  getExportStatus,
+  startExport,
+  type ExportState,
+  type ExportStatus,
+  type ResourceSample,
+} from '../api';
 
 interface Props {
   open: boolean;
@@ -144,6 +150,9 @@ export default function ExportDialog({ open, onClose, onExported }: Props) {
             </div>
           )}
 
+          {/* live resource monitor */}
+          {status?.resources && <ResourceMonitor res={status.resources} live={running} />}
+
           {/* live log */}
           {status && status.log.length > 0 && (
             <div
@@ -221,6 +230,69 @@ export default function ExportDialog({ open, onClose, onExported }: Props) {
             )}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** Live CPU / RAM / GPU meters, fed by the export-status poll (~1.5 s). */
+function ResourceMonitor({ res, live }: { res: ResourceSample; live: boolean }) {
+  const gpuMemPct =
+    res.gpu_mem_used_gb != null && res.gpu_mem_total_gb
+      ? (res.gpu_mem_used_gb / res.gpu_mem_total_gb) * 100
+      : null;
+  const ramPct =
+    res.ram_used_gb != null && res.ram_total_gb ? (res.ram_used_gb / res.ram_total_gb) * 100 : null;
+  const gb = (used: number | null, total: number | null) =>
+    used != null && total != null ? `${used.toFixed(1)} / ${total.toFixed(1)} GB` : undefined;
+
+  const meters = [
+    { label: 'GPU', pct: res.gpu_util_pct },
+    { label: 'GPU mem', pct: gpuMemPct, detail: gb(res.gpu_mem_used_gb, res.gpu_mem_total_gb) },
+    { label: 'CPU', pct: res.cpu_pct },
+    { label: 'RAM', pct: ramPct, detail: gb(res.ram_used_gb, res.ram_total_gb) },
+  ].filter((m) => m.pct != null || m.detail != null);
+  if (meters.length === 0) return null;
+
+  return (
+    <div className="bg-surface-2 border border-surface-3 rounded-lg p-3">
+      <div className="flex items-center gap-2 mb-2.5 text-[10px] uppercase tracking-wide text-gray-500">
+        <Activity className={`w-3 h-3 ${live ? 'text-accent' : ''}`} />
+        Backend resources
+        {res.gpu_name && <span className="font-mono normal-case text-gray-400">· {res.gpu_name}</span>}
+      </div>
+      <div className="grid grid-cols-2 gap-x-5 gap-y-2.5">
+        {meters.map((m) => (
+          <Meter key={m.label} label={m.label} pct={m.pct} detail={m.detail} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Meter({ label, pct, detail }: { label: string; pct: number | null; detail?: string }) {
+  const clamped = pct == null ? 0 : Math.min(100, Math.max(0, pct));
+  const tone =
+    pct == null
+      ? 'bg-surface-4'
+      : clamped > 90
+        ? 'bg-status-red'
+        : clamped > 75
+          ? 'bg-status-amber'
+          : 'bg-accent';
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1 text-[10px]">
+        <span className="text-gray-500 uppercase tracking-wide">{label}</span>
+        <span className="font-mono text-gray-400">
+          {detail ?? (pct != null ? `${pct.toFixed(0)}%` : '—')}
+        </span>
+      </div>
+      <div className="h-1.5 bg-surface-3 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-700 ${tone}`}
+          style={{ width: `${clamped}%` }}
+        />
       </div>
     </div>
   );

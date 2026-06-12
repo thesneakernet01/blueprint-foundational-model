@@ -14,7 +14,8 @@ models/
 
 # Blueprint src/ package (tokenizer, decoder inference) — also fetched at deploy
 # time by scripts/fetch_model.py; upstream NVIDIA code, not committed here.
-src/
+# Anchored to the repo root: frontend/src is real, committed source.
+/src/
 
 # Embeddings cache produced in-app by the export (notebook 04 step)
 data/embeddings/

@@ -90,8 +90,8 @@ def _load_split(name: str):
 def _engineer(gdf):
     """NB05 numeric coercions (Hour from Time, Amount "$…" -> float), on a cuDF
     frame. Run this on the ~EMBED_MAX-row selection, never the full split — the
-    string ops materialise full-size temporaries, which is what blew past the
-    GPU budget on 48 GB cards (L40S) when done before selection."""
+    string ops materialise full-size temporaries, which blows the GPU budget on
+    small cards (the deployed L4 has 24 GB) when done before selection."""
     gdf = gdf.copy()
     gdf["Hour"] = gdf["Time"].str.split(":", n=1, expand=True)[0].astype("int32")
     gdf["Amount"] = (gdf["Amount"].str.replace("$", "", regex=False)

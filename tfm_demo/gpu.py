@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
-"""One-time GPU memory configuration so REAL mode fits a 48 GB L40S (not just
-an 80 GB A100/H100).
+"""One-time GPU memory configuration so REAL mode fits a small card — the
+deployed CML cluster schedules a 24 GB L4, not the 80 GB A100/H100 the
+blueprint assumes.
 
 The checkpoint itself is tiny (~56 MB); what kills smaller cards is allocator
 fragmentation — cuDF/RMM, CuPy, torch and XGBoost each carving a private arena

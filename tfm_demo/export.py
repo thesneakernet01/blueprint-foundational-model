@@ -102,11 +102,13 @@ def _engineer(gdf):
 def _labels(df) -> np.ndarray:
     """Binary fraud labels as a host numpy array (works on cuDF or pandas)."""
     m = ((df[FRAUD_COL] == "Yes") | (df[FRAUD_COL].astype(str) == "1")).astype("int32")
-    # cuDF's .to_numpy() copies device->host through numba.cuda's array view —
-    # the exact path that segfaulted under a drifted numba-cuda (see
-    # requirements-gpu.txt). The Arrow-based to_pandas() copy avoids numba.
-    if hasattr(m, "to_pandas"):
-        m = m.to_pandas()
+    # On non-null numeric columns BOTH .to_numpy() and .to_pandas() copy
+    # device->host through numba.cuda (cuDF's values_host fast path) — the
+    # path that segfaults when the numba driver shim is broken (live crashes
+    # proved to_pandas() does NOT avoid it; see tfm_demo/gpu.py). to_arrow()
+    # copies through libcudf/Arrow with no numba involvement.
+    if hasattr(m, "to_arrow"):
+        return m.to_arrow().to_numpy(zero_copy_only=False).astype("int32", copy=False)
     return np.asarray(m.to_numpy())
 
 
@@ -270,8 +272,10 @@ def _process_split(name, pipeline_cls, inference, emit) -> Dict:
         np.save(lab_p, lab)
         np.save(sel_p, np.asarray(sel))
 
-    raw = df_sel[RAW_FEATURE_COLS].to_pandas()
-    rows = df_sel.to_pandas() if name == "test" else None
+    # Host copies via Arrow, not .to_pandas() — the latter routes non-null
+    # numeric columns through numba.cuda (see _labels).
+    raw = df_sel[RAW_FEATURE_COLS].to_arrow().to_pandas()
+    rows = df_sel.to_arrow().to_pandas() if name == "test" else None
     return {"emb": emb, "y": lab, "sel": np.asarray(sel), "raw": raw, "rows": rows}
 
 
@@ -282,8 +286,27 @@ def run_export(progress: Progress = None) -> Dict:
     """Generate embeddings, train the heads, fit PCA/UMAP, write artifacts."""
     emit = progress or (lambda _m: None)
 
-    from .gpu import configure_gpu_memory
+    from .gpu import configure_gpu_memory, gpu_stack_versions, host_copy_canary
     configure_gpu_memory()                 # RMM pool + cuDF spill, before any cuDF use
+    emit(f"GPU stack: {gpu_stack_versions()}")
+
+    # The cuDF device->host copy path (values_host -> numba.cuda) has
+    # segfaulted on this container, and a SIGSEGV in this worker thread kills
+    # the whole server. Probe it in a throwaway subprocess first so a broken
+    # stack fails the export with a readable error instead.
+    emit("Preflight: probing the cuDF device->host copy path ...")
+    canary_failure = host_copy_canary()
+    if canary_failure:
+        raise RuntimeError(
+            "cuDF device->host copy preflight crashed — the export would "
+            f"segfault the server at its first .to_pandas(). Probe said: "
+            f"{canary_failure}\n"
+            "Knobs: DEMO_NUMBA_NV_BINDING=0 reverts numba to its ctypes driver "
+            "shim (=1/default routes it through cuda-python); re-run the "
+            "'Install dependencies' job to converge the pinned matrix in "
+            "requirements-gpu.txt."
+        )
+    emit("Preflight OK — host copies are healthy.")
 
     import xgboost as xgb
     import torch

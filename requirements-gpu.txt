@@ -19,15 +19,23 @@ cuml-cu12==24.12.*
 cupy-cuda12x
 
 # RAPIDS' numba / CUDA-binding companions, pinned to cudf 24.12's tested matrix
-# (cudf-cu12 24.12 declares numba-cuda>=0.0.13,<0.0.18 and cuda-python<=12.6).
-# numba.cuda is redirected to the numba-cuda package via a .pth hook, so when a
-# later unpinned install drifts these forward, EVERY cuDF host copy
-# (.to_numpy()/.values) segfaults inside the numba CUDA driver shim — seen live
-# as SIGSEGV in export.py _labels via column.data_array_view. Explicit pins make
-# install re-runs converge instead of drifting.
+# (cudf-cu12 24.12 declares numba-cuda>=0.0.13,<0.0.18 and cuda-python<=12.6.0)
+# so install re-runs converge instead of drifting. NOTE: pinning alone did NOT
+# fix the export SIGSEGV — every numba-cuda in cudf 24.12's window has the
+# ctypes-shim `_v2` symbol bug (NVIDIA/numba-cuda#173: r580/CUDA-13 drivers
+# export cuCtxGetDevice_v2 with a new signature; the shim calls it with the old
+# argument list), so on this cluster's driver a matrix-correct install still
+# segfaults every cuDF device->host copy. The fix is routing numba through the
+# cuda-python binding instead (NUMBA_CUDA_USE_NVIDIA_BINDING=1, defaulted in
+# tfm_demo/gpu.py, opt out with DEMO_NUMBA_NV_BINDING=0) — which is why
+# cuda-python is a hard pin here, not just a transitive dep. ==12.6.0 exactly:
+# 12.6.* would resolve to 12.6.2, violating rmm/cudf 24.12's <=12.6.0 cap.
+# (Escape hatch if this matrix rots further: RAPIDS 25.06 — cudf/cuml/rmm
+# ==25.6.*, numba-cuda>=0.11,<0.12, cuda-python>=12.6.2,<13 — is the first
+# release line whose numba-cuda floor includes the #185 fix.)
 numba-cuda==0.0.17
 numba==0.60.*
-cuda-python==12.6.*
+cuda-python==12.6.0
 
 # Decoder foundation model + tokenizer. The +cu121 local version forces the
 # CUDA 12 wheel from the PyTorch index (and so can't be satisfied by a PyPI

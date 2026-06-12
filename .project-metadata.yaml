@@ -105,16 +105,18 @@ tasks:
     entity_label: build_frontend
     short_summary: Run the SPA build.
 
-  # --- fetch the foundation-model checkpoint (Git LFS blob, ~56 MB) ----------
-  # fetch_model.py downloads models/decoder-foundation-model from the NVIDIA TFM
-  # blueprint over plain HTTPS (no git/git-lfs needed). REAL mode + in-app
-  # embedding generation require it. No GPU; stdlib only.
+  # --- fetch the checkpoint (Git LFS blob, ~56 MB) + the blueprint's src/ -----
+  # fetch_model.py downloads models/decoder-foundation-model AND the blueprint's
+  # src/ package (tokenizer, decoder inference) from the NVIDIA TFM repo over
+  # plain HTTPS (no git/git-lfs needed). REAL mode + in-app embedding generation
+  # require both — a standalone CML project has neither, and without src/ the
+  # export fails with "No module named src". No GPU; stdlib only.
   - type: create_job
     name: Fetch model checkpoint
     entity_label: fetch_model
     script: scripts/fetch_model.py
     arguments: None
-    short_summary: Download the decoder-foundation-model checkpoint into ./models.
+    short_summary: Download the model checkpoint into ./models and the blueprint src/ package.
     kernel: Python 3.12
     cpu: 2
     memory: 4

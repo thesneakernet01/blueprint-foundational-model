@@ -22,8 +22,14 @@ cupy-cuda12x
 # CUDA 12 wheel from the PyTorch index (and so can't be satisfied by a PyPI
 # cu13 build). cu121 wheels run on any CUDA 12.x driver; cp312 wheels exist.
 torch==2.5.1+cu121
-transformers
-accelerate
+# transformers is pinned to the version the checkpoint was saved with
+# (config.json "transformers_version": 4.53.3). Unpinned, pip pulls the newest
+# release, whose Llama modeling module no longer imports against torch 2.5.1 —
+# AutoModelForCausalLM.from_pretrained then dies with "Could not import module
+# 'LlamaForCausalLM'. Are this object's requirements defined correctly?".
+# Keep these three in lockstep: bump transformers/accelerate only with torch.
+transformers==4.53.*
+accelerate<2
 safetensors
 sentencepiece
 

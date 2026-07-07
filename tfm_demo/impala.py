@@ -27,8 +27,9 @@ from __future__ import annotations
 
 import math
 import os
+import time
 from contextlib import contextmanager
-from typing import Callable, Dict, List, Optional, Sequence
+from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 from .config import log
 from .settings import get_impala_settings
@@ -59,6 +60,7 @@ _ROW_ID = "row_id"
 
 INSERT_ROWS = int(os.environ.get("IMPALA_INSERT_ROWS", "10000"))
 FETCH_ROWS = int(os.environ.get("IMPALA_FETCH_ROWS", "250000"))
+RETRIES = int(os.environ.get("IMPALA_RETRIES", "3"))     # per-statement, on write
 
 Progress = Optional[Callable[[str], None]]
 
@@ -156,12 +158,82 @@ def _lit(v) -> str:
 # --------------------------------------------------------------------------- #
 # write (prepare_data)
 # --------------------------------------------------------------------------- #
+class _WriteSession:
+    """One connection for a bulk load, with reconnect-and-retry per statement.
+
+    An ingest issues ~100+ statements over one HS2 session across many minutes;
+    transient server-side failures (HMS hiccups, warehouse autoscaling, idle
+    proxies dropping the socket) must not kill the whole load. Retried INSERTs
+    are guarded by a row-count probe so a batch whose rows actually landed
+    before the error surfaced is skipped, never double-inserted (duplicate
+    row_ids would silently break the ORDER BY row_id read contract)."""
+
+    def __init__(self, emit: Callable[[str], None]) -> None:
+        self._emit = emit
+        self._conn = None
+        self._cur = None
+
+    def _cursor(self):
+        if self._cur is None:
+            self._conn = _connect()
+            self._cur = self._conn.cursor()
+        return self._cur
+
+    def reset(self) -> None:
+        for c in (self._cur, self._conn):
+            try:
+                if c is not None:
+                    c.close()
+            except Exception:                                      # noqa: BLE001
+                pass
+        self._cur = self._conn = None
+
+    close = reset
+
+    def _landed(self, guard: Tuple[str, int, int]) -> bool:
+        """True if the guarded INSERT's rows are already in the table."""
+        qualified, before, batch = guard
+        cur = self._cursor()
+        try:
+            cur.execute(f"REFRESH {qualified}")   # fresh coordinator metadata
+        except Exception:                                          # noqa: BLE001
+            pass
+        cur.execute(f"SELECT COUNT(*) FROM {qualified}")
+        count = int(cur.fetchone()[0])
+        if count == before + batch:
+            return True
+        if count == before:
+            return False
+        raise RuntimeError(
+            f"{qualified} holds {count:,} rows mid-retry (expected {before:,} "
+            f"or {before + batch:,}) — table is inconsistent, aborting; re-run "
+            "the data load to rebuild it."
+        )
+
+    def execute(self, sql: str, count_guard: Optional[Tuple[str, int, int]] = None) -> None:
+        for attempt in range(RETRIES + 1):
+            try:
+                if count_guard and attempt and self._landed(count_guard):
+                    self._emit("  (batch already landed on the server — not retrying)")
+                    return
+                self._cursor().execute(sql)
+                return
+            except Exception as exc:                               # noqa: BLE001
+                self.reset()
+                if attempt == RETRIES:
+                    raise
+                self._emit(f"  Impala error (attempt {attempt + 1}/{RETRIES + 1}), "
+                           f"reconnecting: {exc}")
+                time.sleep(min(2 ** (attempt + 1), 15))
+
+
 def write_split(df, split: str, progress: Progress = None) -> int:
     """(Re)create the split's table and load a pandas frame into it. The frame
     must carry exactly the original TabFormer columns (any order). Returns the
     row count written."""
     emit = progress or (lambda m: log.info("[impala] %s", m))
     table = SPLIT_TABLES[split]
+    qualified = _qualified(table)
     cols = list(df.columns)
     missing = [c for c in cols if c not in _SCHEMA]
     if missing:
@@ -173,35 +245,48 @@ def write_split(df, split: str, progress: Progress = None) -> int:
     )
     ins_cols = ", ".join([_bt(_ROW_ID)] + [_bt(_SCHEMA[c][0]) for c in cols])
 
-    with _cursor() as cur:
+    sess = _WriteSession(emit)
+    try:
         try:
-            cur.execute(f"CREATE DATABASE IF NOT EXISTS {_bt(database())}")
+            sess.execute(f"CREATE DATABASE IF NOT EXISTS {_bt(database())}")
         except Exception as exc:                                   # noqa: BLE001
             # The database usually pre-exists; lacking CREATE rights is fine.
             log.info("[impala] CREATE DATABASE skipped: %s", exc)
-        cur.execute(f"DROP TABLE IF EXISTS {_qualified(table)}")
-        cur.execute(f"CREATE TABLE {_qualified(table)} ({ddl_cols}) STORED AS PARQUET")
+        # EXTERNAL + external.table.purge: DROP still deletes the data, but
+        # INSERTs bypass the Hive-ACID transaction path — CDP warehouses default
+        # plain CREATE TABLE to insert-only transactional tables, whose per-
+        # INSERT metastore transactions both throttle the load and die with
+        # "TransactionException ... Broken pipe" on flaky HMS links.
+        sess.execute(f"DROP TABLE IF EXISTS {qualified}")
+        sess.execute(
+            f"CREATE EXTERNAL TABLE IF NOT EXISTS {qualified} ({ddl_cols}) "
+            "STORED AS PARQUET "
+            "TBLPROPERTIES ('external.table.purge'='true')"
+        )
 
         total = len(df)
-        values = df.itertuples(index=False, name=None)
         buf: List[str] = []
         written = 0
-        for i, row in enumerate(values):
-            buf.append("(" + ",".join([str(i)] + [_lit(v) for v in row]) + ")")
-            if len(buf) >= INSERT_ROWS:
-                cur.execute(
-                    f"INSERT INTO {_qualified(table)} ({ins_cols}) VALUES "
-                    + ",".join(buf)
-                )
-                written += len(buf)
-                buf = []
-                emit(f"  {table}: {written:,}/{total:,} rows written")
-        if buf:
-            cur.execute(
-                f"INSERT INTO {_qualified(table)} ({ins_cols}) VALUES " + ",".join(buf)
+
+        def flush() -> None:
+            nonlocal written
+            if not buf:
+                return
+            sess.execute(
+                f"INSERT INTO {qualified} ({ins_cols}) VALUES " + ",".join(buf),
+                count_guard=(qualified, written, len(buf)),
             )
             written += len(buf)
-        emit(f"  {table}: {written:,}/{total:,} rows written")
+            buf.clear()
+            emit(f"  {table}: {written:,}/{total:,} rows written")
+
+        for i, row in enumerate(df.itertuples(index=False, name=None)):
+            buf.append("(" + ",".join([str(i)] + [_lit(v) for v in row]) + ")")
+            if len(buf) >= INSERT_ROWS:
+                flush()
+        flush()
+    finally:
+        sess.close()
     return written
 
 

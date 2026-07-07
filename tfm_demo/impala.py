@@ -61,6 +61,11 @@ _ROW_ID = "row_id"
 INSERT_ROWS = int(os.environ.get("IMPALA_INSERT_ROWS", "10000"))
 FETCH_ROWS = int(os.environ.get("IMPALA_FETCH_ROWS", "250000"))
 RETRIES = int(os.environ.get("IMPALA_RETRIES", "3"))     # per-statement, on write
+# Optional explicit storage prefix for the split tables (e.g.
+# "s3a://my_bucket/tfm_demo") — each table lands at <prefix>/<table>. Use when
+# the warehouse's default external location is broken/misconfigured; leave
+# empty to let the metastore place the tables.
+TABLE_LOCATION = os.environ.get("IMPALA_TABLE_LOCATION", "").rstrip("/")
 
 Progress = Optional[Callable[[str], None]]
 
@@ -210,8 +215,10 @@ class _WriteSession:
             "the data load to rebuild it."
         )
 
-    def execute(self, sql: str, count_guard: Optional[Tuple[str, int, int]] = None) -> None:
-        for attempt in range(RETRIES + 1):
+    def execute(self, sql: str, count_guard: Optional[Tuple[str, int, int]] = None,
+                retries: Optional[int] = None) -> None:
+        retries = RETRIES if retries is None else retries
+        for attempt in range(retries + 1):
             try:
                 if count_guard and attempt and self._landed(count_guard):
                     self._emit("  (batch already landed on the server — not retrying)")
@@ -220,11 +227,16 @@ class _WriteSession:
                 return
             except Exception as exc:                               # noqa: BLE001
                 self.reset()
-                if attempt == RETRIES:
+                if attempt == retries:
                     raise
-                self._emit(f"  Impala error (attempt {attempt + 1}/{RETRIES + 1}), "
-                           f"reconnecting: {exc}")
+                self._emit(f"  Impala error (attempt {attempt + 1}/{retries + 1}), "
+                           f"reconnecting: {_first_line(exc)}")
                 time.sleep(min(2 ** (attempt + 1), 15))
+
+
+def _first_line(exc: Exception) -> str:
+    """Impala/HMS errors nest multi-KB S3 stack traces — keep logs readable."""
+    return str(exc).split("\n", 1)[0][:300]
 
 
 def write_split(df, split: str, progress: Progress = None) -> int:
@@ -257,12 +269,30 @@ def write_split(df, split: str, progress: Progress = None) -> int:
         # plain CREATE TABLE to insert-only transactional tables, whose per-
         # INSERT metastore transactions both throttle the load and die with
         # "TransactionException ... Broken pipe" on flaky HMS links.
+        #
+        # BUT external tables land in the warehouse's *external* storage
+        # location, which some environments misconfigure (seen live: the
+        # database's external dir pointed at a nonexistent S3 bucket and every
+        # createTable RPC 404'd) — so when the external CREATE is rejected,
+        # fall back to a managed table (its storage demonstrably works there)
+        # and let the per-statement retry + count guard carry the ACID inserts.
         sess.execute(f"DROP TABLE IF EXISTS {qualified}")
-        sess.execute(
-            f"CREATE EXTERNAL TABLE IF NOT EXISTS {qualified} ({ddl_cols}) "
-            "STORED AS PARQUET "
-            "TBLPROPERTIES ('external.table.purge'='true')"
-        )
+        loc = f" LOCATION '{TABLE_LOCATION}/{table}'" if TABLE_LOCATION else ""
+        try:
+            sess.execute(
+                f"CREATE EXTERNAL TABLE IF NOT EXISTS {qualified} ({ddl_cols}) "
+                f"STORED AS PARQUET{loc} "
+                "TBLPROPERTIES ('external.table.purge'='true')",
+                retries=0,   # storage misconfig is deterministic — fail fast
+            )
+        except Exception as exc:                                   # noqa: BLE001
+            emit(f"  external table rejected ({_first_line(exc)})")
+            emit(f"  falling back to a managed table for {table} "
+                 "(transactional inserts, slower)")
+            sess.execute(
+                f"CREATE TABLE IF NOT EXISTS {qualified} ({ddl_cols}) "
+                "STORED AS PARQUET"
+            )
 
         total = len(df)
         buf: List[str] = []

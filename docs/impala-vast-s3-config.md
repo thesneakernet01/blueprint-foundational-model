@@ -71,9 +71,15 @@ are invisible to anything not using `mschuler-cloudera`.
 
 ## Validate (Hue, against the Impala VW)
 
+URI anatomy for this environment — the endpoint hostname must NOT appear in it:
+
+```
+s3a://  mschuler-cloudera  /mschuler-bucket/fsi_demo
+scheme  └─ bucket ─┘       └─ folder path inside the bucket ─┘
+```
+
 ```sql
--- bucket-first URI; the endpoint hostname must NOT appear in it
-CREATE DATABASE fsi_demo LOCATION 's3a://mschuler-cloudera/fsi_demo';
+CREATE DATABASE fsi_demo LOCATION 's3a://mschuler-cloudera/mschuler-bucket/fsi_demo';
 CREATE EXTERNAL TABLE fsi_demo.loc_probe (i INT) STORED AS PARQUET;
 INSERT INTO fsi_demo.loc_probe VALUES (1);
 SELECT * FROM fsi_demo.loc_probe;
@@ -81,8 +87,8 @@ DROP TABLE fsi_demo.loc_probe;
 ```
 
 Then run the boto3 connectivity script and list `mschuler-cloudera` — a
-`fsi_demo/loc_probe/` prefix (before the DROP) proves bytes physically landed
-on VAST.
+`mschuler-bucket/fsi_demo/loc_probe/` prefix (before the DROP) proves bytes
+physically landed on VAST.
 
 ## Hook the app up
 

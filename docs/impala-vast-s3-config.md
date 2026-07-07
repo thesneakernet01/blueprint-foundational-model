@@ -1,12 +1,12 @@
-# Wiring the Impala Virtual Warehouse to VAST S3 (`mschuler-bucket`)
+# Wiring the Impala Virtual Warehouse to VAST S3 (`mschuler-cloudera`)
 
 Goal: let the TFM demo's Impala tables live physically in the VAST S3 store at
-`https://s3.previewhub.dev`, bucket `mschuler-bucket`. Everything below is done
+`https://s3.previewhub.dev`, bucket `mschuler-cloudera`. Everything below is done
 in the **Cloudera Data Warehouse (CDW) web UI** — no base-cluster changes.
 
 ## Why each piece is needed
 
-An s3a URI (`s3a://mschuler-bucket/...`) names only the **bucket and path**.
+An s3a URI (`s3a://mschuler-cloudera/...`) names only the **bucket and path**.
 The endpoint, addressing style, and credentials come from `fs.s3a.*`
 configuration properties that each service reads at startup. Two independent
 services touch the bucket, so the properties go in two places:
@@ -22,17 +22,17 @@ All four are scoped to the bucket name — they affect nothing else on the
 warehouse:
 
 ```
-fs.s3a.bucket.mschuler-bucket.endpoint=https://s3.previewhub.dev
-fs.s3a.bucket.mschuler-bucket.path.style.access=true
-fs.s3a.bucket.mschuler-bucket.access.key=<ACCESS KEY>
-fs.s3a.bucket.mschuler-bucket.secret.key=<SECRET KEY>
+fs.s3a.bucket.mschuler-cloudera.endpoint=https://s3.previewhub.dev
+fs.s3a.bucket.mschuler-cloudera.path.style.access=true
+fs.s3a.bucket.mschuler-cloudera.access.key=<ACCESS KEY>
+fs.s3a.bucket.mschuler-cloudera.secret.key=<SECRET KEY>
 ```
 
 Notes:
 - `path.style.access=true` is required for VAST (same as boto3's
   `addressing_style: "path"`).
 - The property prefix is `fs.s3a.bucket.<bucket-name>.` — the bucket name must
-  appear in the key, spelled exactly (`mschuler-bucket`, hyphen not underscore).
+  appear in the key, spelled exactly (`mschuler-cloudera`, hyphen not underscore).
 - Never put the keys in SQL (`SET ...`) — Impala's `SET` only handles query
   options, and statements land in query logs. Config properties do not.
 
@@ -67,20 +67,20 @@ CDW UI → Database Catalogs → the catalog your VW is attached to →
 
 Same four properties. **Apply** restarts the metastore — this briefly affects
 every VW attached to the catalog, but the bucket-scoped properties themselves
-are invisible to anything not using `mschuler-bucket`.
+are invisible to anything not using `mschuler-cloudera`.
 
 ## Validate (Hue, against the Impala VW)
 
 ```sql
 -- bucket-first URI; the endpoint hostname must NOT appear in it
-CREATE DATABASE fsi_demo LOCATION 's3a://mschuler-bucket/fsi_demo';
+CREATE DATABASE fsi_demo LOCATION 's3a://mschuler-cloudera/fsi_demo';
 CREATE EXTERNAL TABLE fsi_demo.loc_probe (i INT) STORED AS PARQUET;
 INSERT INTO fsi_demo.loc_probe VALUES (1);
 SELECT * FROM fsi_demo.loc_probe;
 DROP TABLE fsi_demo.loc_probe;
 ```
 
-Then run the boto3 connectivity script and list `mschuler-bucket` — a
+Then run the boto3 connectivity script and list `mschuler-cloudera` — a
 `fsi_demo/loc_probe/` prefix (before the DROP) proves bytes physically landed
 on VAST.
 
@@ -96,10 +96,10 @@ on VAST.
 
 | Symptom | Meaning | Action |
 |---|---|---|
-| `NoSuchBucketException ... s3a://s3.previewhub.dev/...` | Endpoint hostname crept back into a `LOCATION` URI | Fix the URI: `s3a://mschuler-bucket/...` |
+| `NoSuchBucketException ... s3a://s3.previewhub.dev/...` | Endpoint hostname crept back into a `LOCATION` URI | Fix the URI: `s3a://mschuler-cloudera/...` |
 | `403 / AccessDenied` on the probe | Wrong keys, or key properties missing on one of the components | Re-check all four properties in **both** the VW components and the DBC |
 | `SSL/PKIX handshake` errors | `s3.previewhub.dev` serves an internal-CA certificate the warehouse JVM doesn't trust (the boto3 test skipped verification) | Truststore changes are outside VW config — platform team item; use the managed-table fallback meanwhile |
-| `UnknownHostException s3.previewhub.dev` | The warehouse pods can't resolve/reach the VAST endpoint on the network | Platform/networking item |
+| `UnknownHostException s3.previewhub.dev` | The warehouse pods can't resolve/reach the VAST endpoint on the network | Unlikely here — the boto3 test succeeded from inside a CML session (2026-07-07), so the endpoint is reachable from the platform's pod network; if it still appears, it's a CDW-namespace networking item |
 
 ## Fallback (no config at all)
 

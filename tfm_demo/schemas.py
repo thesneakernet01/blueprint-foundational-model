@@ -35,3 +35,10 @@ class Txn(BaseModel):
     def to_txn(self) -> Dict:
         """Plain dict keyed by the blueprint column names the engine expects."""
         return self.model_dump(by_alias=True)
+
+
+class ImpalaConfig(BaseModel):
+    """Impala target as entered in the UI's Data dialog."""
+
+    connection: str = Field("", description="CML data connection name")
+    database: str = Field("", description="Impala database holding the splits")

@@ -51,6 +51,21 @@ environment_variables:
       proxies it to the backend. Only set this (to an absolute URL) if pointing
       the UI at a separately-hosted backend.
     required: false
+  IMPALA_CONNECTION_NAME:
+    default: ""
+    description: >
+      Optional seed for the CML data connection used for the Impala data layer
+      (training splits are stored in and read from Impala tables). Normally
+      left empty — the connection name and database are entered in the app's
+      Data dialog after deployment and persisted in the project.
+    required: false
+  IMPALA_DATABASE:
+    default: ""
+    description: >
+      Optional seed for the Impala database that holds the train / val_eval /
+      test_eval split tables. Normally left empty and set via the app's Data
+      dialog instead.
+    required: false
 
 # Recommended runtime. REAL mode needs CUDA + RAPIDS (cudf/cuml) + torch, so a
 # GPU runtime that contains the NVIDIA TFM stack (e.g. the NeMo container
@@ -126,18 +141,22 @@ tasks:
     entity_label: fetch_model
     short_summary: Run the checkpoint download.
 
-  # --- prepare data: download TabFormer + build the temporal splits ----------
+  # --- prepare data: download TabFormer + load the splits into Impala --------
   # The dataset isn't in any git repo; prepare_data.py downloads ~2.4 GB from
-  # IBM Box and reproduces NB01's temporal split in chunked pandas (bounded
-  # memory). The work is CPU-only, but we request 4 CPU / 16 GB / 1 GPU because
-  # that's a valid CML resource profile that runs cleanly (a no-GPU combo failed
-  # to schedule); the GPU is just along for the profile. ~15-30 min, idempotent.
+  # IBM Box, reproduces NB01's temporal split in chunked pandas (bounded
+  # memory), and loads the splits into the configured Impala database. The
+  # Impala connection/database are entered in the app's Data dialog (or the
+  # IMPALA_* env vars) — when unset this job prints guidance and exits 0, and
+  # the load is re-run from the UI once configured. The work is CPU-only, but
+  # we request 4 CPU / 16 GB / 1 GPU because that's a valid CML resource
+  # profile that runs cleanly (a no-GPU combo failed to schedule); the GPU is
+  # just along for the profile. ~15-30 min, idempotent.
   - type: create_job
     name: Prepare TabFormer data
     entity_label: prepare_data
     script: scripts/prepare_data.py
     arguments: None
-    short_summary: Download TabFormer and build the temporal-split parquets.
+    short_summary: Download TabFormer and load the temporal splits into Impala.
     kernel: Python 3.12
     cpu: 4
     memory: 16

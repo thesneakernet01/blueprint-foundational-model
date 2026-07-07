@@ -4,3 +4,8 @@ fastapi>=0.110
 uvicorn[standard]>=0.27
 pydantic>=2.5
 joblib>=1.3
+# Impala data layer (tfm_demo/impala.py): the temporal splits live in Impala
+# tables. Connections normally go through cml.data_v1 (ships in the CML
+# runtime, not on PyPI), which drives Impala via impyla underneath — installed
+# explicitly so the direct $IMPALA_HOST fallback also works.
+impyla>=0.19

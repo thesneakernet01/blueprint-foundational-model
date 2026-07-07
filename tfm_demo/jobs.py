@@ -1,20 +1,27 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Background export job manager.
+"""Background job managers for the two long-running UI actions.
 
-The export trains XGBoost heads / PCA / UMAP on the GPU and takes minutes, so the
-API runs it in a daemon thread and the UI polls for progress. On success the
-engine is re-warmed so the new artifacts go live (REAL mode + fresh metrics)
-without a server restart.
+Both run in a daemon thread and stream a line log the UI polls:
+  * ExportManager — trains XGBoost heads / PCA / UMAP on the GPU (minutes); on
+    success the engine is re-warmed so the new artifacts go live without a
+    server restart.
+  * PrepManager — downloads TabFormer and loads the temporal splits into the
+    UI-configured Impala database, by running scripts/prepare_data.py in a
+    subprocess (keeps the multi-GB pandas chunks out of the server process and
+    makes a native crash non-fatal to the API).
 """
 
 from __future__ import annotations
 
 import math
+import os
+import subprocess
+import sys
 import threading
 import time
 from typing import Dict, List, Optional
 
-from .config import log
+from .config import PROJECT_ROOT, log
 from .resources import sample as sample_resources
 
 
@@ -35,9 +42,12 @@ def _jsonsafe(obj):
     return obj
 
 
-class ExportManager:
-    def __init__(self, engine) -> None:
-        self.engine = engine
+class JobManager:
+    """One-at-a-time background job with a streaming line log + status poll."""
+
+    name = "job"
+
+    def __init__(self) -> None:
         self._lock = threading.Lock()
         self._thread: Optional[threading.Thread] = None
         self.state: str = "idle"          # idle | running | done | error
@@ -48,7 +58,7 @@ class ExportManager:
         self.finished_at: Optional[float] = None
 
     def start(self) -> bool:
-        """Kick off an export. Returns False if one is already running."""
+        """Kick off the job. Returns False if one is already running."""
         with self._lock:
             if self.state == "running":
                 return False
@@ -58,29 +68,27 @@ class ExportManager:
             self.error = None
             self.started_at = time.time()
             self.finished_at = None
-        self._thread = threading.Thread(target=self._run, name="tfm-export", daemon=True)
+        self._thread = threading.Thread(
+            target=self._run, name=f"tfm-{self.name}", daemon=True)
         self._thread.start()
         return True
 
     def _emit(self, msg: str) -> None:
-        log.info("[export] %s", msg)
+        log.info("[%s] %s", self.name, msg)
         self.log.append(msg)
+
+    def _work(self) -> Optional[Dict]:
+        raise NotImplementedError
 
     def _run(self) -> None:
         try:
-            # Imported lazily — pulls in cudf/xgboost/torch only when an export runs.
-            from .export import run_export
-
-            self.summary = run_export(progress=self._emit)
-            self._emit("Reloading artifacts into the live engine ...")
-            self.engine.warmup()
-            self._emit(f"Engine reloaded — mode: {self.engine.mode}")
+            self.summary = self._work()
             self.state = "done"
         except Exception as exc:                       # noqa: BLE001
             self.error = str(exc)
             self._emit(f"ERROR: {exc}")
             self.state = "error"
-            log.exception("export failed")
+            log.exception("%s failed", self.name)
         finally:
             self.finished_at = time.time()
 
@@ -91,12 +99,66 @@ class ExportManager:
             elapsed = round(end - self.started_at, 1)
         return _jsonsafe({
             "state": self.state,
-            "log": list(self.log),               # snapshot: the export thread mutates this
+            "log": list(self.log),               # snapshot: the job thread mutates this
             "summary": self.summary,
             "error": self.error,
             "elapsed_sec": elapsed,
-            "engine_mode": self.engine.mode,
-            # Live CPU/RAM/GPU snapshot so the build dialog can show meters
-            # while the export runs (the UI polls this endpoint anyway).
+            # Live CPU/RAM/GPU snapshot so the dialogs can show meters while
+            # the job runs (the UI polls this endpoint anyway).
             "resources": sample_resources(),
         })
+
+
+class ExportManager(JobManager):
+    name = "export"
+
+    def __init__(self, engine) -> None:
+        super().__init__()
+        self.engine = engine
+
+    def _work(self) -> Optional[Dict]:
+        # Imported lazily — pulls in cudf/xgboost/torch only when an export runs.
+        from .export import run_export
+
+        summary = run_export(progress=self._emit)
+        self._emit("Reloading artifacts into the live engine ...")
+        self.engine.warmup()
+        self._emit(f"Engine reloaded — mode: {self.engine.mode}")
+        return summary
+
+    def status(self) -> Dict:
+        return {**super().status(), "engine_mode": self.engine.mode}
+
+
+class PrepManager(JobManager):
+    name = "prepare"
+
+    def _work(self) -> Optional[Dict]:
+        from . import impala
+        from .settings import impala_configured
+
+        if not impala_configured():
+            raise RuntimeError(
+                "Configure the Impala connection and database first (Data dialog)."
+            )
+        script = PROJECT_ROOT / "scripts" / "prepare_data.py"
+        # PREP_FORCE=1: a UI click means "load/refresh the data", so re-ingest
+        # even when the tables already exist.
+        env = {**os.environ, "PREP_FORCE": "1"}
+        self._emit("Starting data preparation (download + split + Impala load) ...")
+        proc = subprocess.Popen(
+            [sys.executable, str(script)],
+            cwd=str(PROJECT_ROOT), env=env, text=True, bufsize=1,
+            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        assert proc.stdout is not None
+        for line in proc.stdout:
+            line = line.rstrip()
+            if line:
+                self._emit(line)
+        code = proc.wait()
+        if code != 0:
+            raise RuntimeError(f"prepare_data.py exited with status {code} — see log above.")
+        # Fresh table counts for the dialog's summary panel.
+        return impala.check()

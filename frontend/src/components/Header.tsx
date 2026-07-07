@@ -1,10 +1,11 @@
-import { Activity, Cpu, Hammer, ShieldAlert } from 'lucide-react';
+import { Activity, Cpu, Database, Hammer, ShieldAlert } from 'lucide-react';
 import type { StatusResp } from '../api';
 
 interface Props {
   status: StatusResp | null;
   error: boolean;
   onBuild: () => void;
+  onData: () => void;
 }
 
 function StatusDot({ tone }: { tone: 'green' | 'amber' | 'neutral' }) {
@@ -17,7 +18,7 @@ function StatusDot({ tone }: { tone: 'green' | 'amber' | 'neutral' }) {
   return <span className={`w-2 h-2 rounded-full ${cls}`} />;
 }
 
-export default function Header({ status, error, onBuild }: Props) {
+export default function Header({ status, error, onBuild, onData }: Props) {
   const real = status?.mode === 'real';
   const modeLabel = error
     ? 'backend offline'
@@ -59,6 +60,13 @@ export default function Header({ status, error, onBuild }: Props) {
           <Cpu className="w-3.5 h-3.5 text-gray-400" />
           <span className="text-gray-400">{status?.gpu ? 'CUDA ready' : 'no GPU'}</span>
         </div>
+        <button
+          onClick={onData}
+          className="flex items-center gap-1.5 bg-surface-3 text-gray-300 hover:bg-surface-4 px-3 py-1.5 text-xs font-medium rounded-md transition-colors"
+        >
+          <Database className="w-3.5 h-3.5" />
+          Data
+        </button>
         <button
           onClick={onBuild}
           className="flex items-center gap-1.5 bg-surface-3 text-gray-300 hover:bg-surface-4 px-3 py-1.5 text-xs font-medium rounded-md transition-colors"

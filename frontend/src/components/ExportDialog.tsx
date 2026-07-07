@@ -139,9 +139,10 @@ export default function ExportDialog({ open, onClose, onExported }: Props) {
           <p className="text-xs text-gray-400 leading-relaxed">
             Trains the three XGBoost heads, fits PCA + UMAP on the foundation-model
             embeddings, and writes <span className="font-mono text-gray-300">demo_artifacts/</span> on
-            the backend. Generates the foundation-model embeddings in-app — requires the model
-            checkpoint, the temporal data splits, and a GPU. When it finishes, the metrics,
-            examples, and embedding map below refresh automatically.
+            the backend. Reads the training splits from the configured Impala database
+            (see the Data dialog) and generates the foundation-model embeddings in-app —
+            requires the model checkpoint, the Impala split tables, and a GPU. When it
+            finishes, the metrics, examples, and embedding map below refresh automatically.
           </p>
 
           {reqError && (
@@ -235,8 +236,9 @@ export default function ExportDialog({ open, onClose, onExported }: Props) {
   );
 }
 
-/** Live CPU / RAM / GPU meters, fed by the export-status poll (~1.5 s). */
-function ResourceMonitor({ res, live }: { res: ResourceSample; live: boolean }) {
+/** Live CPU / RAM / GPU meters, fed by the job-status poll (~1.5 s).
+ *  Shared with DataDialog (the Impala data-load job reports the same shape). */
+export function ResourceMonitor({ res, live }: { res: ResourceSample; live: boolean }) {
   const gpuMemPct =
     res.gpu_mem_used_gb != null && res.gpu_mem_total_gb
       ? (res.gpu_mem_used_gb / res.gpu_mem_total_gb) * 100

@@ -22,13 +22,16 @@ from fastapi.responses import JSONResponse
 
 from .config import MODEL_DIR, cors_origins
 from .engine import Engine
-from .jobs import ExportManager
-from .schemas import Txn
+from .jobs import ExportManager, PrepManager
+from .schemas import ImpalaConfig, Txn
+from .settings import get_impala_settings, save_impala_settings
 
 # Single process-wide engine; warmed up on startup by the lifespan hook.
 engine = Engine()
 # Background export runner; reloads `engine` on success.
 exporter = ExportManager(engine)
+# Background TabFormer -> Impala data load (subprocess wrapper).
+preparer = PrepManager()
 
 
 @asynccontextmanager
@@ -91,6 +94,40 @@ def create_app() -> FastAPI:
     def export_status() -> JSONResponse:
         return JSONResponse(exporter.status())
 
+    # ---- Impala data target (settings come from the UI's Data dialog) ------
+    @app.get("/api/impala")
+    def impala_settings() -> JSONResponse:
+        """Current connection/database. No connectivity probe — GETs stay fast;
+        POST (save) is what tests the connection."""
+        return JSONResponse(get_impala_settings())
+
+    @app.post("/api/impala")
+    def impala_configure(cfg: ImpalaConfig) -> JSONResponse:
+        """Save the connection/database, then connect and report per-split row
+        counts. A cold CDW warehouse can take a while to wake — the UI shows a
+        spinner for the duration."""
+        from . import impala  # lazy: pulls in the impyla/cml client stack
+
+        try:
+            saved = save_impala_settings(cfg.connection, cfg.database)
+        except ValueError as exc:
+            return JSONResponse({"error": str(exc)}, status_code=422)
+        return JSONResponse({**saved, "check": impala.check()})
+
+    @app.post("/api/impala/prepare")
+    def start_prepare() -> JSONResponse:
+        """Download TabFormer and (re)load the splits into Impala. Returns
+        immediately; poll /api/impala/prepare/status. 409 if already running."""
+        started = preparer.start()
+        return JSONResponse(
+            {"started": started, **preparer.status()},
+            status_code=202 if started else 409,
+        )
+
+    @app.get("/api/impala/prepare/status")
+    def prepare_status() -> JSONResponse:
+        return JSONResponse(preparer.status())
+
     @app.get("/")
     def root() -> JSONResponse:
         """Health / info root. The UI is the standalone React SPA in frontend/,
@@ -100,7 +137,7 @@ def create_app() -> FastAPI:
             "mode": engine.mode,
             "gpu": engine.gpu,
             "endpoints": ["/api/status", "/api/summary", "/api/examples",
-                          "/api/umap", "/api/score"],
+                          "/api/umap", "/api/score", "/api/impala"],
         })
 
     return app

@@ -18,8 +18,9 @@ so the API can run it on the GPU backend and stream progress to the UI (see
 tfm_demo/jobs.py); the root `export_for_demo.py` shim runs it from the CLI.
 
 Prerequisites at runtime: the decoder-foundation-model checkpoint (config.MODEL_DIR
-/ $MODEL_DIR), the blueprint's src/, and the temporal parquet splits under
-config.DATA_DIR.
+/ $MODEL_DIR), the blueprint's src/, and the temporal splits loaded into the
+UI-configured Impala database (scripts/prepare_data.py writes them; see
+tfm_demo/impala.py).
 """
 
 from __future__ import annotations
@@ -37,8 +38,16 @@ from .config import (
     RAW_FEATURE_COLS, TOKENIZER_COLS,
 )
 
-EMBED_DIR = DATA_DIR / "embeddings"
-TEMPORAL_DIR = DATA_DIR / "TabFormer" / "temporal_split"
+EMBED_ROOT = DATA_DIR / "embeddings"
+
+
+def _embed_dir():
+    """Embedding cache dir, keyed by the target Impala database. The cached
+    sel/labels/embeddings are row-POSITION-keyed, so a cache built against one
+    database's tables must never be reused against another's (prepare_data
+    clears the current database's cache on re-ingest for the same reason)."""
+    from . import impala
+    return EMBED_ROOT / impala.database()
 
 # Per-split row cap for in-app embedding generation, so the UI "Build artifacts"
 # button stays tractable (embedding the full multi-million-row dataset would take
@@ -73,18 +82,19 @@ _SOURCE_COLS = list(dict.fromkeys(
 
 
 def _load_split(name: str):
-    """Read a temporal parquet into a cuDF frame on the GPU — raw columns only,
-    no feature engineering yet.
+    """Read a temporal split from Impala into a cuDF frame on the GPU — raw
+    columns only, no feature engineering yet.
 
-    The whole split (up to PREP_TRAIN_CAP rows) stays on the GPU — only the
-    ~EMBED_MAX-row selections are later copied to host (see run_export). The old
-    code did `.to_pandas()` on the *full* frame for all three splits at once,
-    which materialised millions of Python strings and OOM-killed the process on
-    the 16 GB host container before the model even loaded. Keeping the heavy
-    frames in cuDF fixes that and keeps the pipeline GPU-native (RAPIDS).
+    impala.read_split_cudf pulls the table in bounded chunks (host holds one
+    chunk of pandas at a time) and pushes each straight to the GPU, ORDER BY
+    row_id so row positions are stable across runs — the embedding cache and
+    the sel arrays are keyed by position. The whole split (up to PREP_TRAIN_CAP
+    rows) then stays on the GPU — only the ~EMBED_MAX-row selections are later
+    copied back to host (see run_export); materialising full splits on the host
+    OOM-killed the 16 GB container in an earlier revision.
     """
-    import cudf
-    return cudf.read_parquet(str(TEMPORAL_DIR / name), columns=_SOURCE_COLS)
+    from . import impala
+    return impala.read_split_cudf(name, _SOURCE_COLS)
 
 
 def _engineer(gdf):
@@ -187,9 +197,9 @@ def _embed_rows(tok_df, pipeline_cls, inference, emit) -> np.ndarray:
     return np.vstack(out)
 
 
-# split key -> parquet filename / RNG seed for the natural-rate subsample.
-_SPLIT_FILES = {"train": "train.parquet", "val": "val_eval.parquet",
-                "test": "test_eval.parquet"}
+# split keys (Impala table names live in impala.SPLIT_TABLES) / RNG seed for
+# the natural-rate subsample.
+_SPLITS = ("train", "val", "test")
 _SPLIT_SEED = {"val": 7, "test": 11}
 
 
@@ -215,10 +225,11 @@ def _meminfo() -> str:
 
 
 def _all_cached() -> bool:
-    return all((EMBED_DIR / f"{s}_embeddings.npy").exists()
-               and (EMBED_DIR / f"{s}_labels.npy").exists()
-               and (EMBED_DIR / f"{s}_sel.npy").exists()
-               for s in _SPLIT_FILES)
+    d = _embed_dir()
+    return all((d / f"{s}_embeddings.npy").exists()
+               and (d / f"{s}_labels.npy").exists()
+               and (d / f"{s}_sel.npy").exists()
+               for s in _SPLITS)
 
 
 def _process_split(name, pipeline_cls, inference, emit) -> Dict:
@@ -231,13 +242,14 @@ def _process_split(name, pipeline_cls, inference, emit) -> Dict:
     Returns {emb (N,512), y (N,), sel (N,), raw (pandas N×RAW_FEATURE_COLS),
     rows (pandas full selected rows for the test split's examples, else None)}.
     """
-    emb_p = EMBED_DIR / f"{name}_embeddings.npy"
-    lab_p = EMBED_DIR / f"{name}_labels.npy"
-    sel_p = EMBED_DIR / f"{name}_sel.npy"
+    d = _embed_dir()
+    emb_p = d / f"{name}_embeddings.npy"
+    lab_p = d / f"{name}_labels.npy"
+    sel_p = d / f"{name}_sel.npy"
     cached = emb_p.exists() and lab_p.exists() and sel_p.exists()
 
-    emit(f"Loading {name} split ...")
-    df = _load_split(_SPLIT_FILES[name])
+    emit(f"Loading {name} split from Impala ...")
+    df = _load_split(name)
     emit(f"  {name}: {len(df):,} rows loaded  [{_meminfo()}]")
 
     if cached:
@@ -286,6 +298,18 @@ def run_export(progress: Progress = None) -> Dict:
     """Generate embeddings, train the heads, fit PCA/UMAP, write artifacts."""
     emit = progress or (lambda _m: None)
 
+    # Fail fast (before the GPU stack loads) if the Impala splits aren't there.
+    from . import impala
+    emit("Checking Impala training data ...")
+    ready, detail = impala.splits_ready()
+    if not ready:
+        raise RuntimeError(
+            f"Impala training data not ready: {detail}. Open the Data dialog "
+            "in the UI to configure the connection/database and run the data "
+            "load (or run scripts/prepare_data.py)."
+        )
+    emit(f"Impala splits ready ({impala.database()}): {detail}")
+
     from .gpu import configure_gpu_memory, gpu_stack_versions, host_copy_canary
     configure_gpu_memory()                 # RMM pool + cuDF spill, before any cuDF use
     emit(f"GPU stack: {gpu_stack_versions()}")
@@ -323,17 +347,12 @@ def run_export(progress: Progress = None) -> Dict:
         pass
 
     OUT.mkdir(exist_ok=True)
-    if not TEMPORAL_DIR.exists():
-        raise FileNotFoundError(
-            f"temporal splits missing at {TEMPORAL_DIR} — set $DATA_DIR or place "
-            "the TabFormer temporal_split parquets there."
-        )
     xgb_device = "cuda" if torch.cuda.is_available() else "cpu"
     emit(f"Compute device: {xgb_device}")
 
     # ---- per split: load -> select -> embed -> free (peak = ONE split) ----
     # The model is loaded once, only if some split still needs embedding.
-    EMBED_DIR.mkdir(parents=True, exist_ok=True)
+    _embed_dir().mkdir(parents=True, exist_ok=True)
     pipeline_cls = inference = None
     if not _all_cached():
         emit("Generating embeddings in-app (notebook 04 step) ...")

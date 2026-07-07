@@ -63,6 +63,30 @@ The top-left badge always tells you what's running:
   with clearly-labelled synthetic scores so you can build/preview the front end
   off-GPU (e.g. on a laptop). Nothing is ever silently faked.
 
+## Training data · Impala
+
+The temporal splits live in **Impala tables**, not local files: `train`,
+`val_eval` and `test_eval` inside a database you pick. The flow is:
+
+1. Open the **Data** dialog (header button) and enter your **CML data
+   connection** name and the **Impala database**, then *Save & test* — the
+   dialog shows per-table row counts. (`$IMPALA_CONNECTION_NAME` /
+   `$IMPALA_DATABASE` seed the defaults; the UI-saved values win and persist in
+   `.impala_settings.json`.)
+2. Click **Load TabFormer → Impala** — downloads the ~2.4 GB TabFormer dump,
+   rebuilds NB01's temporal split in chunked pandas, and ingests the three
+   tables (`scripts/prepare_data.py`, also runnable as the CML job).
+3. **Build artifacts** (training) then reads the splits straight from Impala
+   into cuDF on the GPU.
+
+Details that matter: rows carry a `row_id` and every read is `ORDER BY row_id`
+(Impala SELECTs are unordered, and the embedding cache is keyed by row
+position); TabFormer's column names are mapped to snake_case in Impala
+(`Is Fraud?` → `is_fraud`) and mapped back on read; re-ingesting a database
+clears its embedding cache under `data/embeddings/<db>/`. Outside CML you can
+bypass the data connection with `$IMPALA_HOST` (+ `_PORT/_USER/_PASSWORD/
+_AUTH/_SSL/_HTTP`) to use impyla directly.
+
 ## Demo flow (suggested)
 
 1. Point at the metrics strip: baseline AUC/AP vs the foundation-model head, and

@@ -138,3 +138,56 @@ export async function startExport(): Promise<{ started: boolean } & ExportStatus
 }
 
 export const getExportStatus = () => getJSON<ExportStatus>('/api/export/status');
+
+// ---- Impala data target (splits are stored in / trained from Impala) --------
+
+export interface ImpalaSettings {
+  connection: string;
+  database: string;
+}
+
+/** Connectivity + per-split row counts (null = table missing). */
+export interface ImpalaCheck {
+  ok: boolean;
+  error: string | null;
+  connection: string;
+  database: string;
+  tables: Record<string, number | null>;
+}
+
+export const getImpala = () => getJSON<ImpalaSettings>('/api/impala');
+
+/** Save the connection/database, then test it. Slow on a cold warehouse. */
+export async function postImpala(cfg: ImpalaSettings): Promise<ImpalaSettings & { check: ImpalaCheck }> {
+  const res = await fetch(`${API_BASE}/api/impala`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(cfg),
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(body?.error ?? `/api/impala → ${res.status} ${res.statusText}`);
+  }
+  return body;
+}
+
+/** Data-load (TabFormer download → split → Impala) job status; same shape as
+ *  ExportStatus except summary is the post-load Impala check. */
+export interface PrepareStatus {
+  state: ExportState;
+  log: string[];
+  summary: ImpalaCheck | null;
+  error: string | null;
+  elapsed_sec: number | null;
+  resources?: ResourceSample | null;
+}
+
+export async function startPrepare(): Promise<{ started: boolean } & PrepareStatus> {
+  const res = await fetch(`${API_BASE}/api/impala/prepare`, { method: 'POST' });
+  if (res.status !== 202 && res.status !== 409) {
+    throw new Error(`/api/impala/prepare → ${res.status} ${res.statusText}`);
+  }
+  return await res.json();
+}
+
+export const getPrepareStatus = () => getJSON<PrepareStatus>('/api/impala/prepare/status');

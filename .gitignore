@@ -20,6 +20,9 @@ models/
 # Embeddings cache produced in-app by the export (notebook 04 step)
 data/embeddings/
 
+# Runtime settings saved from the UI's Data dialog (per-deployment state)
+.impala_settings.json
+
 # Node / frontend build (frontend/ has its own .gitignore too)
 node_modules/
 dist/

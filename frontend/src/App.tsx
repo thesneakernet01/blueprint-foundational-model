@@ -8,6 +8,7 @@ import TransactionComposer, {
 } from './components/TransactionComposer';
 import ModelHeads from './components/ModelHeads';
 import ExportDialog from './components/ExportDialog';
+import DataDialog from './components/DataDialog';
 
 // Recharts is heavy and only the embedding map needs it — load it in its own
 // chunk so the first paint (header / composer / heads) isn't blocked on it.
@@ -37,6 +38,7 @@ export default function App() {
   const [scoring, setScoring] = useState(false);
   const [scoreError, setScoreError] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
+  const [dataOpen, setDataOpen] = useState(false);
 
   // Load (or reload) all dashboard data. Each call degrades on its own.
   const refresh = useCallback(() => {
@@ -76,7 +78,12 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-surface-0 flex flex-col">
-      <Header status={status} error={statusError} onBuild={() => setExportOpen(true)} />
+      <Header
+        status={status}
+        error={statusError}
+        onBuild={() => setExportOpen(true)}
+        onData={() => setDataOpen(true)}
+      />
 
       <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 space-y-6 max-w-[1400px] w-full mx-auto">
         <MetricsStrip summary={summary} />
@@ -105,6 +112,7 @@ export default function App() {
         onClose={() => setExportOpen(false)}
         onExported={refresh}
       />
+      <DataDialog open={dataOpen} onClose={() => setDataOpen(false)} />
     </div>
   );
 }

@@ -1,22 +1,28 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Generate the TabFormer temporal-split parquets the export needs.
+"""Generate the TabFormer temporal splits and load them into Impala.
 
 The dataset is in no git repo: NB01 downloads it (~2.4 GB transactions.tgz from
-IBM Box) and writes the temporal splits to data/TabFormer/temporal_split/. NB01
-does this with cuDF over the full ~24M rows, which OOMs a single modest GPU — so
-we reproduce its logic here in plain, chunked pandas (CPU, bounded memory):
+IBM Box). NB01 splits it with cuDF over the full ~24M rows, which OOMs a single
+modest GPU — so we reproduce its logic here in plain, chunked pandas (CPU,
+bounded memory):
 
   * download + extract card_transaction.v1.csv (same IBM Box source as NB01),
   * temporal split by date cutoffs at 80% / 90% cumulative rows (NB01's rule),
   * stratified ~100K val_eval / test_eval subsets (NB01's eval workflow),
-  * write train.parquet, val_eval.parquet, test_eval.parquet with the raw
-    transaction columns (Amount as "$…", Time as "HH:MM", Is Fraud? as Yes/No) —
-    exactly what tfm_demo/export.py reads.
+  * load the splits into the Impala tables <db>.train / val_eval / test_eval
+    with the raw transaction columns (Amount as "$…", Time as "HH:MM",
+    Is Fraud? as Yes/No) — exactly what tfm_demo/export.py reads back.
+
+The Impala connection name and database come from the UI's Data dialog (stored
+via tfm_demo/settings.py; $IMPALA_CONNECTION_NAME / $IMPALA_DATABASE seed the
+defaults). When they're unset this script prints guidance and exits 0, so the
+AMP setup job doesn't fail a fresh deployment where the UI hasn't run yet.
 
 Disk-frugal: the big tgz/CSV go to a scratch dir ($PREP_SCRATCH, default the
-system temp), not the project volume; only the parquets land under DATA_DIR, and
-the scratch is removed at the end. Train is capped ($PREP_TRAIN_CAP, default 1M).
-Idempotent; honors config.DATA_DIR ($DATA_DIR). No GPU required.
+system temp), not the project volume, and the scratch is removed at the end.
+Train is capped ($PREP_TRAIN_CAP, default 1M). Idempotent — skips when the
+tables are already populated — unless $PREP_FORCE=1 (the UI's "Load data"
+button forces, so a click always re-ingests). No GPU required.
 
 Run:  python scripts/prepare_data.py
 """
@@ -38,6 +44,8 @@ except NameError:
     _ROOT = Path.cwd()
 sys.path.insert(0, str(_ROOT))
 from tfm_demo.config import DATA_DIR  # noqa: E402
+from tfm_demo import impala  # noqa: E402
+from tfm_demo.settings import get_impala_settings, impala_configured  # noqa: E402
 
 # Same shared file NB01 pulls from IBM Box.
 DOWNLOAD_URL = (
@@ -62,8 +70,7 @@ SEED = 42
 SCRATCH = Path(os.environ.get("PREP_SCRATCH") or tempfile.gettempdir()) / "tfm_tabformer"
 TGZ_PATH = SCRATCH / "transactions.tgz"
 CSV_PATH = SCRATCH / "card_transaction.v1.csv"
-TEMPORAL_DIR = DATA_DIR / "TabFormer" / "temporal_split"
-REQUIRED = ["train.parquet", "val_eval.parquet", "test_eval.parquet"]
+FORCE = os.environ.get("PREP_FORCE", "") == "1"
 
 
 def _download() -> None:
@@ -142,9 +149,18 @@ def _diag(tag: str) -> None:
 
 
 def main() -> None:
-    if all((TEMPORAL_DIR / f).exists() for f in REQUIRED):
-        print(f"prepare_data: temporal splits already present in {TEMPORAL_DIR}")
+    if not impala_configured():
+        print("prepare_data: no Impala connection/database configured yet — "
+              "set them in the UI's Data dialog (or $IMPALA_CONNECTION_NAME / "
+              "$IMPALA_DATABASE) and re-run. Nothing to do.")
         return
+    db = get_impala_settings()["database"]
+    if not FORCE:
+        ready, detail = impala.splits_ready()
+        if ready:
+            print(f"prepare_data: splits already loaded in Impala '{db}' "
+                  f"({detail}) — set PREP_FORCE=1 to re-ingest.")
+            return
 
     import numpy as np
     import pandas as pd
@@ -206,17 +222,24 @@ def main() -> None:
     test_eval = pd.concat(test_parts, ignore_index=True); del test_parts
     _diag("after split")
 
-    TEMPORAL_DIR.mkdir(parents=True, exist_ok=True)
-    train_df.to_parquet(TEMPORAL_DIR / "train.parquet", index=False)
-    val_eval.to_parquet(TEMPORAL_DIR / "val_eval.parquet", index=False)
-    test_eval.to_parquet(TEMPORAL_DIR / "test_eval.parquet", index=False)
+    def emit(msg: str) -> None:
+        print(msg, flush=True)
+
+    print(f"prepare_data: loading splits into Impala database '{db}' ...", flush=True)
+    impala.write_split(train_df, "train", progress=emit)
+    impala.write_split(val_eval, "val", progress=emit)
+    impala.write_split(test_eval, "test", progress=emit)
+
+    # The export's embedding cache is row-position-keyed against these tables —
+    # a re-ingest invalidates it, so drop this database's cache dir.
+    shutil.rmtree(DATA_DIR / "embeddings" / db, ignore_errors=True)
 
     def rate(df):
         return df["Is Fraud?"].astype(str).str.lower().eq("yes").mean() * 100
 
     print(f"prepare_data: wrote train={len(train_df):,} ({rate(train_df):.3f}% fraud)  "
           f"val_eval={len(val_eval):,} ({rate(val_eval):.3f}%)  "
-          f"test_eval={len(test_eval):,} ({rate(test_eval):.3f}%) -> {TEMPORAL_DIR}", flush=True)
+          f"test_eval={len(test_eval):,} ({rate(test_eval):.3f}%) -> Impala '{db}'", flush=True)
 
     shutil.rmtree(SCRATCH, ignore_errors=True)            # drop the big CSV/scratch
 

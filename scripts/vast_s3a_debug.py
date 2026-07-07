@@ -162,9 +162,14 @@ def main() -> None:
     }
     target = f"s3a://{BUCKET}/{PATH}/"
 
+    # Run EVERY variant even when the round trip passes: the question is not
+    # only "does it work" but "does any variant make the HEAD stop 400ing" —
+    # a zero-400 variant is a direct warehouse fix for Impala's validation.
+    verdicts = []
     for name, extra in VARIANTS:
         print(f"\n=== variant: {name} ===")
         all_ok = True
+        n400 = 0
         for step, args in _steps(target):
             logf = WORK / f"wire-{name}-{step}.log"
             with open(logf, "w") as out:
@@ -172,30 +177,38 @@ def main() -> None:
                     [str(hadoop_home / "bin" / "hadoop"), "fs", *extra, *args],
                     env=env, stdout=out, stderr=subprocess.STDOUT, text=True,
                 ).returncode
-            print(f"  {step:<7} {'OK' if rc == 0 else f'FAILED (exit {rc})'}")
+            hits = logf.read_text(errors="replace").count("Status Code: 400")
+            n400 += hits
+            print(f"  {step:<7} {'OK' if rc == 0 else f'FAILED (exit {rc})'}"
+                  f"{f'  ({hits} recovered 400s)' if hits else ''}")
             if rc != 0:
                 all_ok = False
                 print(f"  --- raw HTTP around the 400 ({logf}) ---")
                 print(_head_excerpt(logf))
                 print("  ---")
                 break
-        if all_ok:
-            print(f"\nSUCCESS: full mkdir/write/list/delete round trip works "
-                  f"with variant '{name}'.")
-            if extra:
-                print("Warehouse fix: fs.s3a.bucket."
-                      f"{BUCKET}.audit.enabled=false on coordinator/executor/"
-                      "catalogd (and the Database Catalog metastore).")
-            else:
-                print("The write path is fine despite the HEAD 400 — s3a "
-                      "recovers via LIST. The CDW failure is Impala's strict "
-                      "LOCATION validation surfacing the HEAD error; share the "
-                      "HEAD wire capture from wire-base-*.log with the VAST "
-                      "admin (HEAD on a missing key should 404, not 400).")
-            return
+        verdicts.append((name, extra, all_ok, n400))
+        print(f"  round trip: {'OK' if all_ok else 'FAILED'} · "
+              f"HTTP 400s seen: {n400}")
 
-    print("\nWrite path failed in all variants — the raw HTTP excerpts above "
-          "are what the VAST/previewhub admin needs.")
+    clean = next((v for v in verdicts if v[2] and v[3] == 0), None)
+    print()
+    if clean:
+        name, extra, *_ = clean
+        print(f"CLEAN VARIANT FOUND: '{name}' — round trip OK with ZERO 400s.")
+        if extra:
+            prop = extra[0][2:].split("=")
+            print(f"Warehouse fix: fs.s3a.bucket.{BUCKET}.{prop[0][7:]} = {prop[1]}")
+            print("Add it to coordinator/executor/catalogd hadoop-core-site "
+                  "(and the Database Catalog metastore), then retry "
+                  "CREATE DATABASE ... LOCATION in Hue.")
+    else:
+        print("No variant eliminated the 400s (round trip may still pass — "
+              "Hadoop recovers, Impala's validation doesn't).")
+        print("Raw failing HEAD for the VAST admin — run:")
+        print(f"  grep -a -B2 -A12 'HTTP/1.1 400' {WORK}/wire-base-mkdir.log | head -60")
+        print("(HEAD on a missing key should return 404; VAST returns a "
+              "bodiless 400 for this request shape.)")
 
 
 if __name__ == "__main__":

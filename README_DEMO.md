@@ -63,29 +63,45 @@ The top-left badge always tells you what's running:
   with clearly-labelled synthetic scores so you can build/preview the front end
   off-GPU (e.g. on a laptop). Nothing is ever silently faked.
 
-## Training data · Impala
+## Training data · storage (VAST S3 or Impala)
 
-The temporal splits live in **Impala tables**, not local files: `train`,
-`val_eval` and `test_eval` inside a database you pick. The flow is:
+The temporal splits `train`, `val_eval` and `test_eval` live in a storage
+target you pick in the **Data** dialog (header button) — not in local files.
+Two backends (`tfm_demo/storage.py` dispatches):
 
-1. Open the **Data** dialog (header button) and enter your **CML data
-   connection** name and the **Impala database**, then *Save & test* — the
-   dialog shows per-table row counts. (`$IMPALA_CONNECTION_NAME` /
-   `$IMPALA_DATABASE` seed the defaults; the UI-saved values win and persist in
-   `.impala_settings.json`.)
-2. Click **Load TabFormer → Impala** — downloads the ~2.4 GB TabFormer dump,
-   rebuilds NB01's temporal split in chunked pandas, and ingests the three
-   tables (`scripts/prepare_data.py`, also runnable as the CML job).
-3. **Build artifacts** (training) then reads the splits straight from Impala
-   into cuDF on the GPU.
+- **VAST S3** (default when configured) — each split is one Parquet object at
+  `s3://<bucket>/<prefix>/<split>.parquet`, written and read **directly with
+  boto3**. No warehouse in the path — this exists because the CDW/Impala s3a
+  client is rejected by the VAST endpoint with a bare `400` while the same S3
+  calls succeed via boto3 (see `docs/impala-vast-s3-config.md` and
+  `scripts/vast_probe.py`). Enter endpoint / bucket / folder / keys in the
+  dialog (`$VAST_ENDPOINT`, `$VAST_BUCKET`, `$VAST_PATH`, `$VAST_ACCESS_KEY`,
+  `$VAST_SECRET_KEY` seed the defaults — the same env vars the probe script
+  uses). Path-style addressing and sigv4 are hard-wired; TLS verification is
+  off for the internal-CA endpoint unless `$VAST_VERIFY_SSL=1` (or a CA bundle
+  path).
+- **Impala (CDW)** — splits as Impala tables through a **CML data connection**
+  (`$IMPALA_CONNECTION_NAME` / `$IMPALA_DATABASE` seed the defaults; outside
+  CML, `$IMPALA_HOST` + `_PORT/_USER/_PASSWORD/_AUTH/_SSL/_HTTP` bypasses the
+  connection with impyla directly).
 
-Details that matter: rows carry a `row_id` and every read is `ORDER BY row_id`
-(Impala SELECTs are unordered, and the embedding cache is keyed by row
-position); TabFormer's column names are mapped to snake_case in Impala
-(`Is Fraud?` → `is_fraud`) and mapped back on read; re-ingesting a database
-clears its embedding cache under `data/embeddings/<db>/`. Outside CML you can
-bypass the data connection with `$IMPALA_HOST` (+ `_PORT/_USER/_PASSWORD/
-_AUTH/_SSL/_HTTP`) to use impyla directly.
+The flow is the same either way:
+
+1. Open the **Data** dialog, pick the backend, fill in the target, *Save &
+   test* — the dialog shows per-split row counts. Settings persist in
+   `.data_settings.json` (mode 0600; it can hold the VAST secret key).
+2. Click **Load TabFormer → …** — downloads the ~2.4 GB TabFormer dump,
+   rebuilds NB01's temporal split in chunked pandas, and writes the three
+   splits (`scripts/prepare_data.py`, also runnable as the CML job).
+3. **Build artifacts** (training) then reads the splits back into cuDF on the
+   GPU.
+
+Details that matter: reads are row-position-stable (Impala: a `row_id` column
++ `ORDER BY row_id`; VAST: Parquet's inherent row order) because the embedding
+cache is keyed by row position; re-ingesting a target clears its embedding
+cache under `data/embeddings/<cache-key>/`. On the Impala backend TabFormer's
+column names are mapped to snake_case (`Is Fraud?` → `is_fraud`) and mapped
+back on read; Parquet keeps the original names.
 
 ## Demo flow (suggested)
 

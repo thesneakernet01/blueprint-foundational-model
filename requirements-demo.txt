@@ -9,3 +9,10 @@ joblib>=1.3
 # runtime, not on PyPI), which drives Impala via impyla underneath — installed
 # explicitly so the direct $IMPALA_HOST fallback also works.
 impyla>=0.19
+# VAST S3 data layer (tfm_demo/vast.py): splits written as Parquet objects
+# straight to VAST with boto3 — the warehouse's s3a path 400s against VAST,
+# boto3 does not (see docs/impala-vast-s3-config.md). pyarrow does the Parquet
+# encode/decode (GPU containers already ship it via cudf; listed so the
+# CPU-only prepare job has it too).
+boto3>=1.34
+pyarrow>=14

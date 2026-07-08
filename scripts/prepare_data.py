@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Generate the TabFormer temporal splits and load them into Impala.
+"""Generate the TabFormer temporal splits and load them into storage.
 
 The dataset is in no git repo: NB01 downloads it (~2.4 GB transactions.tgz from
 IBM Box). NB01 splits it with cuDF over the full ~24M rows, which OOMs a single
@@ -9,14 +9,15 @@ bounded memory):
   * download + extract card_transaction.v1.csv (same IBM Box source as NB01),
   * temporal split by date cutoffs at 80% / 90% cumulative rows (NB01's rule),
   * stratified ~100K val_eval / test_eval subsets (NB01's eval workflow),
-  * load the splits into the Impala tables <db>.train / val_eval / test_eval
-    with the raw transaction columns (Amount as "$…", Time as "HH:MM",
+  * load the splits train / val_eval / test_eval into the configured storage
+    backend — Impala tables or Parquet objects on VAST S3 (tfm_demo/storage.py)
+    — with the raw transaction columns (Amount as "$…", Time as "HH:MM",
     Is Fraud? as Yes/No) — exactly what tfm_demo/export.py reads back.
 
-The Impala connection name and database come from the UI's Data dialog (stored
-via tfm_demo/settings.py; $IMPALA_CONNECTION_NAME / $IMPALA_DATABASE seed the
-defaults). When they're unset this script prints guidance and exits 0, so the
-AMP setup job doesn't fail a fresh deployment where the UI hasn't run yet.
+The storage target comes from the UI's Data dialog (stored via
+tfm_demo/settings.py; $IMPALA_* / $VAST_* env vars seed the defaults). When
+it's unconfigured this script prints guidance and exits 0, so the AMP setup
+job doesn't fail a fresh deployment where the UI hasn't run yet.
 
 Disk-frugal: the big tgz/CSV go to a scratch dir ($PREP_SCRATCH, default the
 system temp), not the project volume, and the scratch is removed at the end.
@@ -44,8 +45,7 @@ except NameError:
     _ROOT = Path.cwd()
 sys.path.insert(0, str(_ROOT))
 from tfm_demo.config import DATA_DIR  # noqa: E402
-from tfm_demo import impala  # noqa: E402
-from tfm_demo.settings import get_impala_settings, impala_configured  # noqa: E402
+from tfm_demo import storage  # noqa: E402
 
 # Same shared file NB01 pulls from IBM Box.
 DOWNLOAD_URL = (
@@ -149,17 +149,18 @@ def _diag(tag: str) -> None:
 
 
 def main() -> None:
-    if not impala_configured():
-        print("prepare_data: no Impala connection/database configured yet — "
-              "set them in the UI's Data dialog (or $IMPALA_CONNECTION_NAME / "
-              "$IMPALA_DATABASE) and re-run. Nothing to do.")
+    if not storage.configured():
+        print("prepare_data: no storage target configured yet — set it in the "
+              "UI's Data dialog (or $IMPALA_CONNECTION_NAME/$IMPALA_DATABASE, "
+              "or $VAST_ENDPOINT/$VAST_BUCKET/$VAST_ACCESS_KEY/$VAST_SECRET_KEY"
+              ") and re-run. Nothing to do.")
         return
-    db = get_impala_settings()["database"]
+    target = storage.target()
     if not FORCE:
-        ready, detail = impala.splits_ready()
+        ready, detail = storage.splits_ready()
         if ready:
-            print(f"prepare_data: splits already loaded in Impala '{db}' "
-                  f"({detail}) — set PREP_FORCE=1 to re-ingest.")
+            print(f"prepare_data: splits already loaded ({target}: {detail}) "
+                  "— set PREP_FORCE=1 to re-ingest.")
             return
 
     import numpy as np
@@ -225,21 +226,21 @@ def main() -> None:
     def emit(msg: str) -> None:
         print(msg, flush=True)
 
-    print(f"prepare_data: loading splits into Impala database '{db}' ...", flush=True)
-    impala.write_split(train_df, "train", progress=emit)
-    impala.write_split(val_eval, "val", progress=emit)
-    impala.write_split(test_eval, "test", progress=emit)
+    print(f"prepare_data: loading splits into {target} ...", flush=True)
+    storage.write_split(train_df, "train", progress=emit)
+    storage.write_split(val_eval, "val", progress=emit)
+    storage.write_split(test_eval, "test", progress=emit)
 
     # The export's embedding cache is row-position-keyed against these tables —
-    # a re-ingest invalidates it, so drop this database's cache dir.
-    shutil.rmtree(DATA_DIR / "embeddings" / db, ignore_errors=True)
+    # a re-ingest invalidates it, so drop this target's cache dir.
+    shutil.rmtree(DATA_DIR / "embeddings" / storage.cache_key(), ignore_errors=True)
 
     def rate(df):
         return df["Is Fraud?"].astype(str).str.lower().eq("yes").mean() * 100
 
     print(f"prepare_data: wrote train={len(train_df):,} ({rate(train_df):.3f}% fraud)  "
           f"val_eval={len(val_eval):,} ({rate(val_eval):.3f}%)  "
-          f"test_eval={len(test_eval):,} ({rate(test_eval):.3f}%) -> Impala '{db}'", flush=True)
+          f"test_eval={len(test_eval):,} ({rate(test_eval):.3f}%) -> {target}", flush=True)
 
     shutil.rmtree(SCRATCH, ignore_errors=True)            # drop the big CSV/scratch
 

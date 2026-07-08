@@ -42,3 +42,22 @@ class ImpalaConfig(BaseModel):
 
     connection: str = Field("", description="CML data connection name")
     database: str = Field("", description="Impala database holding the splits")
+
+
+class VastConfig(BaseModel):
+    """VAST S3 target as entered in the UI's Data dialog. An empty secret_key
+    on save means "keep the stored one" (the API never echoes it back)."""
+
+    endpoint: str = Field("", description="S3 endpoint URL, e.g. https://s3.previewhub.dev")
+    bucket: str = Field("", description="Bucket name")
+    prefix: str = Field("", description="Folder path inside the bucket for the split objects")
+    access_key: str = Field("", description="S3 access key")
+    secret_key: str = Field("", description="S3 secret key ('' = keep stored)")
+
+
+class DataConfig(BaseModel):
+    """Storage target for the training splits (the UI's Data dialog)."""
+
+    backend: str = Field("impala", description="'impala' or 'vast'")
+    impala: ImpalaConfig = Field(default_factory=ImpalaConfig)
+    vast: VastConfig = Field(default_factory=VastConfig)

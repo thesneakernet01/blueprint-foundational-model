@@ -20,8 +20,10 @@ models/
 # Embeddings cache produced in-app by the export (notebook 04 step)
 data/embeddings/
 
-# Runtime settings saved from the UI's Data dialog (per-deployment state)
+# Runtime settings saved from the UI's Data dialog (per-deployment state;
+# .data_settings.json can hold the VAST S3 secret key — never commit it)
 .impala_settings.json
+.data_settings.json
 
 # Node / frontend build (frontend/ has its own .gitignore too)
 node_modules/

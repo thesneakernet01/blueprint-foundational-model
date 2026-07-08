@@ -139,55 +139,75 @@ export async function startExport(): Promise<{ started: boolean } & ExportStatus
 
 export const getExportStatus = () => getJSON<ExportStatus>('/api/export/status');
 
-// ---- Impala data target (splits are stored in / trained from Impala) --------
+// ---- data target (splits stored in Impala tables or on VAST S3) -------------
+
+export type DataBackend = 'impala' | 'vast';
 
 export interface ImpalaSettings {
   connection: string;
   database: string;
 }
 
-/** Connectivity + per-split row counts (null = table missing). */
-export interface ImpalaCheck {
+export interface VastSettings {
+  endpoint: string;
+  bucket: string;
+  prefix: string;
+  access_key: string;
+  /** Always '' from the server; send '' to keep the stored secret. */
+  secret_key: string;
+  /** GET-only: whether a secret is already stored server-side. */
+  secret_set?: boolean;
+}
+
+export interface DataSettings {
+  backend: DataBackend;
+  impala: ImpalaSettings;
+  vast: VastSettings;
+}
+
+/** Connectivity + per-split row counts (null = table/object missing). */
+export interface DataCheck {
   ok: boolean;
   error: string | null;
-  connection: string;
-  database: string;
+  backend: DataBackend;
+  /** Human-readable description of the target, e.g. "VAST s3://bucket/prefix @ endpoint". */
+  target: string;
   tables: Record<string, number | null>;
 }
 
-export const getImpala = () => getJSON<ImpalaSettings>('/api/impala');
+export const getDataSettings = () => getJSON<DataSettings>('/api/data');
 
-/** Save the connection/database, then test it. Slow on a cold warehouse. */
-export async function postImpala(cfg: ImpalaSettings): Promise<ImpalaSettings & { check: ImpalaCheck }> {
-  const res = await fetch(`${API_BASE}/api/impala`, {
+/** Save the storage target, then test it. Slow on a cold warehouse. */
+export async function postDataSettings(cfg: DataSettings): Promise<DataSettings & { check: DataCheck }> {
+  const res = await fetch(`${API_BASE}/api/data`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(cfg),
   });
   const body = await res.json().catch(() => null);
   if (!res.ok) {
-    throw new Error(body?.error ?? `/api/impala → ${res.status} ${res.statusText}`);
+    throw new Error(body?.error ?? `/api/data → ${res.status} ${res.statusText}`);
   }
   return body;
 }
 
-/** Data-load (TabFormer download → split → Impala) job status; same shape as
- *  ExportStatus except summary is the post-load Impala check. */
+/** Data-load (TabFormer download → split → storage) job status; same shape as
+ *  ExportStatus except summary is the post-load storage check. */
 export interface PrepareStatus {
   state: ExportState;
   log: string[];
-  summary: ImpalaCheck | null;
+  summary: DataCheck | null;
   error: string | null;
   elapsed_sec: number | null;
   resources?: ResourceSample | null;
 }
 
 export async function startPrepare(): Promise<{ started: boolean } & PrepareStatus> {
-  const res = await fetch(`${API_BASE}/api/impala/prepare`, { method: 'POST' });
+  const res = await fetch(`${API_BASE}/api/data/prepare`, { method: 'POST' });
   if (res.status !== 202 && res.status !== 409) {
-    throw new Error(`/api/impala/prepare → ${res.status} ${res.statusText}`);
+    throw new Error(`/api/data/prepare → ${res.status} ${res.statusText}`);
   }
   return await res.json();
 }
 
-export const getPrepareStatus = () => getJSON<PrepareStatus>('/api/impala/prepare/status');
+export const getPrepareStatus = () => getJSON<PrepareStatus>('/api/data/prepare/status');

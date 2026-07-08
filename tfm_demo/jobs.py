@@ -6,9 +6,9 @@ Both run in a daemon thread and stream a line log the UI polls:
     success the engine is re-warmed so the new artifacts go live without a
     server restart.
   * PrepManager — downloads TabFormer and loads the temporal splits into the
-    UI-configured Impala database, by running scripts/prepare_data.py in a
-    subprocess (keeps the multi-GB pandas chunks out of the server process and
-    makes a native crash non-fatal to the API).
+    UI-configured storage target (Impala database or VAST S3), by running
+    scripts/prepare_data.py in a subprocess (keeps the multi-GB pandas chunks
+    out of the server process and makes a native crash non-fatal to the API).
 """
 
 from __future__ import annotations
@@ -134,18 +134,18 @@ class PrepManager(JobManager):
     name = "prepare"
 
     def _work(self) -> Optional[Dict]:
-        from . import impala
-        from .settings import impala_configured
+        from . import storage
 
-        if not impala_configured():
+        if not storage.configured():
             raise RuntimeError(
-                "Configure the Impala connection and database first (Data dialog)."
+                "Configure the storage target first (Data dialog)."
             )
         script = PROJECT_ROOT / "scripts" / "prepare_data.py"
         # PREP_FORCE=1: a UI click means "load/refresh the data", so re-ingest
         # even when the tables already exist.
         env = {**os.environ, "PREP_FORCE": "1"}
-        self._emit("Starting data preparation (download + split + Impala load) ...")
+        self._emit(f"Starting data preparation (download + split + load into "
+                   f"{storage.target()}) ...")
         proc = subprocess.Popen(
             [sys.executable, str(script)],
             cwd=str(PROJECT_ROOT), env=env, text=True, bufsize=1,
@@ -161,4 +161,4 @@ class PrepManager(JobManager):
         if code != 0:
             raise RuntimeError(f"prepare_data.py exited with status {code} — see log above.")
         # Fresh table counts for the dialog's summary panel.
-        return impala.check()
+        return storage.check()

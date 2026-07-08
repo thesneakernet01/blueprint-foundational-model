@@ -4,18 +4,20 @@ import {
   CheckCircle,
   Database,
   DownloadCloud,
+  HardDrive,
   Loader2,
   Plug,
   X,
 } from 'lucide-react';
 import {
-  getImpala,
+  getDataSettings,
   getPrepareStatus,
-  postImpala,
+  postDataSettings,
   startPrepare,
-  type ExportState,
-  type ImpalaCheck,
+  type DataBackend,
+  type DataCheck,
   type PrepareStatus,
+  type ExportState,
 } from '../api';
 import { ResourceMonitor } from './ExportDialog';
 
@@ -33,14 +35,68 @@ const STATE_META: Record<ExportState, { label: string; cls: string }> = {
   error: { label: 'Failed', cls: 'bg-status-red/20 text-status-red' },
 };
 
+const BACKEND_META: Record<DataBackend, { label: string; hint: string }> = {
+  vast: {
+    label: 'VAST S3',
+    hint: 'Splits written as Parquet objects straight to the VAST bucket with boto3 — no warehouse in the write path.',
+  },
+  impala: {
+    label: 'Impala (CDW)',
+    hint: 'Splits loaded as Impala tables through a CML data connection.',
+  },
+};
+
+const FIELD_CLS =
+  'mt-1 w-full bg-surface-0 border border-surface-3 rounded-md px-3 py-1.5 text-sm font-mono text-gray-200 placeholder-gray-600 focus:outline-none focus:border-accent';
+
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = 'text',
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  type?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="text-[10px] uppercase tracking-wide text-gray-500">{label}</span>
+      <input
+        value={value}
+        type={type}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        spellCheck={false}
+        autoComplete="off"
+        className={FIELD_CLS}
+      />
+    </label>
+  );
+}
+
 /**
- * Impala data target: the CML data connection + database that hold the
- * temporal split tables. prepare_data writes them; training/export reads them.
+ * Storage target for the training splits: either an Impala database (CML data
+ * connection) or a VAST S3 bucket written directly with boto3. prepare_data
+ * writes the splits there; training/export reads them back.
  */
 export default function DataDialog({ open, onClose }: Props) {
+  const [backend, setBackend] = useState<DataBackend>('vast');
+  // impala
   const [connection, setConnection] = useState('');
   const [database, setDatabase] = useState('');
-  const [check, setCheck] = useState<ImpalaCheck | null>(null);
+  // vast
+  const [endpoint, setEndpoint] = useState('');
+  const [bucket, setBucket] = useState('');
+  const [prefix, setPrefix] = useState('');
+  const [accessKey, setAccessKey] = useState('');
+  const [secretKey, setSecretKey] = useState('');
+  const [secretSet, setSecretSet] = useState(false);
+
+  const [check, setCheck] = useState<DataCheck | null>(null);
   const [testing, setTesting] = useState(false);
   const [reqError, setReqError] = useState<string | null>(null);
 
@@ -80,10 +136,17 @@ export default function DataDialog({ open, onClose }: Props) {
   useEffect(() => {
     if (!open) return;
     setReqError(null);
-    getImpala()
+    getDataSettings()
       .then((s) => {
-        setConnection(s.connection);
-        setDatabase(s.database);
+        setBackend(s.backend);
+        setConnection(s.impala.connection);
+        setDatabase(s.impala.database);
+        setEndpoint(s.vast.endpoint);
+        setBucket(s.vast.bucket);
+        setPrefix(s.vast.prefix);
+        setAccessKey(s.vast.access_key);
+        setSecretKey('');
+        setSecretSet(Boolean(s.vast.secret_set));
       })
       .catch(() => {});
     getPrepareStatus()
@@ -106,14 +169,26 @@ export default function DataDialog({ open, onClose }: Props) {
     setReqError(null);
     setCheck(null);
     try {
-      const r = await postImpala({ connection, database });
+      const r = await postDataSettings({
+        backend,
+        impala: { connection, database },
+        vast: {
+          endpoint,
+          bucket,
+          prefix,
+          access_key: accessKey,
+          secret_key: secretKey, // '' keeps the stored secret
+        },
+      });
       setCheck(r.check);
+      setSecretKey('');
+      setSecretSet(Boolean(r.vast.secret_set));
     } catch (e) {
-      setReqError(e instanceof Error ? e.message : 'Failed to save Impala settings');
+      setReqError(e instanceof Error ? e.message : 'Failed to save data settings');
     } finally {
       setTesting(false);
     }
-  }, [connection, database]);
+  }, [backend, connection, database, endpoint, bucket, prefix, accessKey, secretKey]);
 
   const runPrepare = useCallback(async () => {
     setPrepBusy(true);
@@ -134,7 +209,13 @@ export default function DataDialog({ open, onClose }: Props) {
   const state = prep?.state ?? 'idle';
   const running = state === 'running';
   const meta = STATE_META[state];
-  const configured = connection.trim() !== '' && database.trim() !== '';
+  const configured =
+    backend === 'impala'
+      ? connection.trim() !== '' && database.trim() !== ''
+      : endpoint.trim() !== '' &&
+        bucket.trim() !== '' &&
+        accessKey.trim() !== '' &&
+        (secretKey.trim() !== '' || secretSet);
 
   return (
     <div
@@ -148,7 +229,7 @@ export default function DataDialog({ open, onClose }: Props) {
         {/* header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-surface-3">
           <div className="flex items-center gap-3">
-            <h2 className="text-base font-semibold text-white">Training data · Impala</h2>
+            <h2 className="text-base font-semibold text-white">Training data · storage</h2>
             {state !== 'idle' && (
               <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${meta.cls}`}>
                 {meta.label}
@@ -169,57 +250,104 @@ export default function DataDialog({ open, onClose }: Props) {
         {/* body */}
         <div className="p-5 space-y-4 overflow-y-auto">
           <p className="text-xs text-gray-400 leading-relaxed">
-            The temporal training splits live in Impala tables{' '}
-            <span className="font-mono text-gray-300">train</span>,{' '}
+            The temporal training splits <span className="font-mono text-gray-300">train</span>,{' '}
             <span className="font-mono text-gray-300">val_eval</span> and{' '}
-            <span className="font-mono text-gray-300">test_eval</span>. Point the app at a CML
-            data connection and database, then load TabFormer into it — artifact builds
-            (training) read from these tables.
+            <span className="font-mono text-gray-300">test_eval</span> live in the storage target
+            below. Load TabFormer into it — artifact builds (training) read the splits back from
+            there.
           </p>
 
-          {/* connection form */}
-          <div className="space-y-3">
-            <label className="block">
-              <span className="text-[10px] uppercase tracking-wide text-gray-500">
-                CML data connection
-              </span>
-              <input
-                value={connection}
-                onChange={(e) => setConnection(e.target.value)}
-                placeholder="e.g. default-impala"
-                spellCheck={false}
-                className="mt-1 w-full bg-surface-0 border border-surface-3 rounded-md px-3 py-1.5 text-sm font-mono text-gray-200 placeholder-gray-600 focus:outline-none focus:border-accent"
-              />
-            </label>
-            <label className="block">
-              <span className="text-[10px] uppercase tracking-wide text-gray-500">
-                Impala database
-              </span>
-              <input
-                value={database}
-                onChange={(e) => setDatabase(e.target.value)}
-                placeholder="e.g. tfm_demo"
-                spellCheck={false}
-                className="mt-1 w-full bg-surface-0 border border-surface-3 rounded-md px-3 py-1.5 text-sm font-mono text-gray-200 placeholder-gray-600 focus:outline-none focus:border-accent"
-              />
-            </label>
-            <button
-              onClick={saveAndTest}
-              disabled={testing || !configured}
-              className="flex items-center gap-2 bg-surface-3 text-gray-300 hover:bg-surface-4 px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {testing ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> Connecting… (a suspended
-                  warehouse can take a minute)
-                </>
-              ) : (
-                <>
-                  <Plug className="w-3.5 h-3.5" /> Save &amp; test connection
-                </>
-              )}
-            </button>
+          {/* backend switch */}
+          <div className="flex gap-2">
+            {(['vast', 'impala'] as DataBackend[]).map((b) => (
+              <button
+                key={b}
+                onClick={() => {
+                  setBackend(b);
+                  setCheck(null);
+                }}
+                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+                  backend === b
+                    ? 'bg-accent/15 border-accent/60 text-accent'
+                    : 'bg-surface-0 border-surface-3 text-gray-400 hover:text-gray-200'
+                }`}
+              >
+                {b === 'vast' ? <HardDrive className="w-3.5 h-3.5" /> : <Database className="w-3.5 h-3.5" />}
+                {BACKEND_META[b].label}
+              </button>
+            ))}
           </div>
+          <p className="text-[11px] text-gray-500">{BACKEND_META[backend].hint}</p>
+
+          {/* connection form */}
+          {backend === 'impala' ? (
+            <div className="space-y-3">
+              <Field
+                label="CML data connection"
+                value={connection}
+                onChange={setConnection}
+                placeholder="e.g. default-impala"
+              />
+              <Field
+                label="Impala database"
+                value={database}
+                onChange={setDatabase}
+                placeholder="e.g. tfm_demo"
+              />
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <Field
+                label="S3 endpoint"
+                value={endpoint}
+                onChange={setEndpoint}
+                placeholder="e.g. https://s3.previewhub.dev"
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <Field
+                  label="Bucket"
+                  value={bucket}
+                  onChange={setBucket}
+                  placeholder="e.g. mschuler-cloudera"
+                />
+                <Field
+                  label="Folder (prefix)"
+                  value={prefix}
+                  onChange={setPrefix}
+                  placeholder="e.g. mschuler-bucket/fsi_demo"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Access key" value={accessKey} onChange={setAccessKey} />
+                <Field
+                  label="Secret key"
+                  value={secretKey}
+                  onChange={setSecretKey}
+                  type="password"
+                  placeholder={secretSet ? '(unchanged)' : ''}
+                />
+              </div>
+            </div>
+          )}
+
+          <button
+            onClick={saveAndTest}
+            disabled={testing || !configured}
+            className="flex items-center gap-2 bg-surface-3 text-gray-300 hover:bg-surface-4 px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {testing ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                {backend === 'impala'
+                  ? 'Connecting… (a suspended warehouse can take a minute)'
+                  : 'Probing the bucket…'}
+              </>
+            ) : (
+              <>
+                <Plug className="w-3.5 h-3.5" /> Save &amp; test connection
+              </>
+            )}
+          </button>
 
           {reqError && (
             <div className="px-4 py-3 bg-status-red-dim/30 border border-status-red/40 rounded-lg text-sm text-status-red">
@@ -239,9 +367,10 @@ export default function DataDialog({ open, onClose }: Props) {
               {check.ok ? (
                 <>
                   <div className="flex items-center gap-2 mb-3 text-status-green text-sm">
-                    <CheckCircle className="w-4 h-4" />
-                    Connected · database{' '}
-                    <span className="font-mono">{check.database}</span>
+                    <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                    <span>
+                      Connected · <span className="font-mono text-xs">{check.target}</span>
+                    </span>
                   </div>
                   <div className="grid grid-cols-3 gap-x-6 text-xs">
                     {Object.entries(check.tables).map(([table, rows]) => (
@@ -308,7 +437,7 @@ export default function DataDialog({ open, onClose }: Props) {
         <div className="px-5 py-4 border-t border-surface-3 flex items-center justify-between gap-3">
           <p className="text-[11px] text-gray-500 flex items-center gap-1.5">
             <Database className="w-3.5 h-3.5" />
-            Load downloads ~2.4 GB of TabFormer and re-ingests the tables.
+            Load downloads ~2.4 GB of TabFormer and re-ingests the splits.
           </p>
           <div className="flex gap-3">
             <button
@@ -320,7 +449,7 @@ export default function DataDialog({ open, onClose }: Props) {
             <button
               onClick={runPrepare}
               disabled={prepBusy || running || !configured}
-              title={configured ? undefined : 'Save the connection and database first'}
+              title={configured ? undefined : 'Save the storage settings first'}
               className="flex items-center gap-2 bg-accent text-white hover:bg-accent/90 px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {prepBusy || running ? (
@@ -329,7 +458,8 @@ export default function DataDialog({ open, onClose }: Props) {
                 </>
               ) : (
                 <>
-                  <DownloadCloud className="w-3.5 h-3.5" /> Load TabFormer → Impala
+                  <DownloadCloud className="w-3.5 h-3.5" /> Load TabFormer →{' '}
+                  {BACKEND_META[backend].label}
                 </>
               )}
             </button>

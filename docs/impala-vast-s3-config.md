@@ -1,5 +1,12 @@
 # Wiring the Impala Virtual Warehouse to VAST S3 (`mschuler-cloudera`)
 
+> **Superseded for the app's own data (2026-07-08):** the demo no longer needs
+> any of this to put its training splits on VAST — the Data dialog's **VAST
+> S3** backend writes Parquet objects to the bucket directly with boto3
+> (`tfm_demo/vast.py`), sidestepping the unresolved s3a `400` documented at the
+> bottom of this file. Keep this doc for the day Impala tables themselves must
+> live on VAST.
+
 Goal: let the TFM demo's Impala tables live physically in the VAST S3 store at
 `https://s3.previewhub.dev`, bucket `mschuler-cloudera`. Everything below is done
 in the **Cloudera Data Warehouse (CDW) web UI** — no base-cluster changes.

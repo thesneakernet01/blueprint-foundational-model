@@ -227,9 +227,10 @@ def main() -> None:
         print(msg, flush=True)
 
     print(f"prepare_data: loading splits into {target} ...", flush=True)
-    storage.write_split(train_df, "train", progress=emit)
-    storage.write_split(val_eval, "val", progress=emit)
-    storage.write_split(test_eval, "test", progress=emit)
+    # write_splits overlaps the three uploads on the VAST backend (each split
+    # is an independent object PUT); Impala loads stay sequential inside it.
+    storage.write_splits(
+        {"train": train_df, "val": val_eval, "test": test_eval}, progress=emit)
 
     # The export's embedding cache is row-position-keyed against these tables —
     # a re-ingest invalidates it, so drop this target's cache dir.

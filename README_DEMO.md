@@ -79,7 +79,15 @@ Two backends (`tfm_demo/storage.py` dispatches):
   `$VAST_SECRET_KEY` seed the defaults — the same env vars the probe script
   uses). Path-style addressing and sigv4 are hard-wired; TLS verification is
   off for the internal-CA endpoint unless `$VAST_VERIFY_SSL=1` (or a CA bundle
-  path).
+  path). Uploads are parallel twice over — the three splits upload
+  concurrently, and each object bigger than one part is a concurrent multipart
+  upload — and resilient: TCP keepalive, generous timeouts, and whole-upload
+  retries with backoff (the endpoint has been seen dropping TLS mid-part).
+  Knobs: `$VAST_UPLOAD_PART_MB` (default 8, clamped to S3's 5 MiB minimum),
+  `$VAST_UPLOAD_CONCURRENCY` (default 8), `$VAST_UPLOAD_RETRIES` (default 3).
+  On a slow/flaky link try `VAST_UPLOAD_PART_MB=5` (smaller parts finish
+  before proxy timeouts) and lower concurrency; if multipart itself is the
+  problem, a large part size (e.g. 64) forces single PUTs.
 - **Impala (CDW)** — splits as Impala tables through a **CML data connection**
   (`$IMPALA_CONNECTION_NAME` / `$IMPALA_DATABASE` seed the defaults; outside
   CML, `$IMPALA_HOST` + `_PORT/_USER/_PASSWORD/_AUTH/_SSL/_HTTP` bypasses the

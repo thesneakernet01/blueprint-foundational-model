@@ -26,7 +26,10 @@ bundle file).
 from __future__ import annotations
 
 import io
+import math
 import os
+import threading
+import time
 from typing import Callable, Dict, Optional, Sequence
 
 from .config import log
@@ -39,6 +42,23 @@ SPLIT_TABLES = {"train": "train", "val": "val_eval", "test": "test_eval"}
 # read_split_cudf (one row group of pandas/arrow on the host at a time).
 ROW_GROUP_ROWS = int(os.environ.get("VAST_ROW_GROUP_ROWS", "250000"))
 _ROWS_META = "rows"
+
+# Upload transfer tuning. previewhub is a high-latency WAN endpoint, so
+# throughput comes from parts in flight, not from a single stream: files above
+# the part size are split into part-size chunks PUT concurrently. Anything at
+# or below one part goes as a single PUT — multipart's initiate/complete
+# round-trips are pure overhead there (boto3's 8 MB default turned an 11 MB
+# upload into a 2-part multipart: all the overhead, no parallelism).
+# Part size is clamped to S3's 5 MiB minimum for non-final parts; smaller
+# parts survive flaky/slow paths better (each finishes before proxy send
+# timeouts — the live failure was an SSLEOFError mid-part), bigger parts have
+# less per-request overhead.
+UPLOAD_PART_MB = max(5, int(os.environ.get("VAST_UPLOAD_PART_MB", "8")))
+UPLOAD_CONCURRENCY = int(os.environ.get("VAST_UPLOAD_CONCURRENCY", "8"))
+# Whole-upload retries: the endpoint has been seen closing TLS mid-part
+# (SSLEOFError) after botocore's own per-request retries are spent, so each
+# split upload restarts from the buffered Parquet bytes with backoff.
+UPLOAD_RETRIES = int(os.environ.get("VAST_UPLOAD_RETRIES", "3"))
 
 Progress = Optional[Callable[[str], None]]
 
@@ -84,6 +104,16 @@ def _client():
             s3={"addressing_style": "path"},           # required by VAST
             signature_version="s3v4",
             retries={"max_attempts": 5, "mode": "standard"},
+            # The pool must fit every concurrent part upload plus the parallel
+            # per-split writers (storage.write_splits), or urllib3 serialises
+            # them again behind pool checkouts.
+            max_pool_connections=max(10, UPLOAD_CONCURRENCY + len(SPLIT_TABLES)),
+            # The path to the endpoint is slow and proxied: keep idle-looking
+            # long transfers alive and don't declare a stall until well past a
+            # slow part's real duration.
+            tcp_keepalive=True,
+            connect_timeout=30,
+            read_timeout=300,
         ),
         verify=_verify(),
     )
@@ -125,20 +155,48 @@ def write_split(df, split: str, progress: Progress = None) -> int:
     size = buf.tell()
     buf.seek(0)
 
-    emit(f"  {table}: uploading {size / 1e6:.1f} MB to s3://{bucket}/{key} ...")
+    from boto3.s3.transfer import TransferConfig
+
+    part = UPLOAD_PART_MB << 20
+    parts = max(1, math.ceil(size / part))
+    emit(f"  {table}: uploading {size / 1e6:.1f} MB to s3://{bucket}/{key} "
+         f"({parts} part(s) × {UPLOAD_PART_MB} MB, "
+         f"concurrency {min(parts, UPLOAD_CONCURRENCY)}) ...")
     sent = [0]
+    lock = threading.Lock()                           # parts complete on worker threads
 
     def _cb(n: int) -> None:                          # upload progress, ~every 32 MB
-        before = sent[0]
-        sent[0] += n
-        if sent[0] // (32 << 20) != before // (32 << 20) or sent[0] >= size:
-            emit(f"  {table}: {sent[0] / 1e6:.0f}/{size / 1e6:.0f} MB uploaded")
+        with lock:
+            before = sent[0]
+            sent[0] += n
+            done = sent[0]
+        if done // (32 << 20) != before // (32 << 20) or done >= size:
+            emit(f"  {table}: {done / 1e6:.0f}/{size / 1e6:.0f} MB uploaded")
 
-    client.upload_fileobj(
-        buf, bucket, key,
-        ExtraArgs={"Metadata": {_ROWS_META: str(len(df))}},
-        Callback=_cb,
-    )
+    for attempt in range(UPLOAD_RETRIES + 1):
+        buf.seek(0)
+        sent[0] = 0
+        try:
+            client.upload_fileobj(
+                buf, bucket, key,
+                ExtraArgs={"Metadata": {_ROWS_META: str(len(df))}},
+                Callback=_cb,
+                Config=TransferConfig(
+                    # threshold > part size: a file of exactly one part stays a
+                    # single PUT instead of a one-part multipart.
+                    multipart_threshold=part + 1,
+                    multipart_chunksize=part,
+                    max_concurrency=UPLOAD_CONCURRENCY,
+                ),
+            )
+            break
+        except Exception as exc:                                   # noqa: BLE001
+            if attempt == UPLOAD_RETRIES:
+                raise
+            delay = min(2 ** (attempt + 1), 30)
+            emit(f"  {table}: upload failed (attempt {attempt + 1}/"
+                 f"{UPLOAD_RETRIES + 1}): {_first_line(exc)} — retrying in {delay}s")
+            time.sleep(delay)
     emit(f"  {table}: {len(df):,} rows written")
     return len(df)
 

@@ -68,6 +68,26 @@ def write_split(df, split: str, progress: Progress = None) -> int:
     return _mod().write_split(df, split, progress=progress)
 
 
+def write_splits(frames: Dict, progress: Progress = None) -> Dict[str, int]:
+    """Write several splits ({split_key: frame}); returns {split_key: rows}.
+
+    On VAST the writes run concurrently — each is an independent object upload
+    to a high-latency endpoint, so overlapping them stacks the three transfer
+    windows instead of queueing them (boto3 clients are thread-safe). Impala
+    stays sequential: its writes are hundreds of INSERT statements against one
+    coordinator, where parallel sessions just contend."""
+    if backend() == "vast" and len(frames) > 1:
+        from concurrent.futures import ThreadPoolExecutor
+        mod = _mod()
+        with ThreadPoolExecutor(max_workers=len(frames),
+                                thread_name_prefix="vast-write") as pool:
+            futures = {split: pool.submit(mod.write_split, df, split, progress=progress)
+                       for split, df in frames.items()}
+            return {split: f.result() for split, f in futures.items()}
+    return {split: write_split(df, split, progress=progress)
+            for split, df in frames.items()}
+
+
 def read_split_cudf(split: str, columns: Sequence[str]):
     return _mod().read_split_cudf(split, columns)
 

@@ -139,7 +139,40 @@ def _client():
         config=config,
         verify=_verify(),
     )
+
+    # botocore stamps `Expect: 100-continue` on every FILE-LIKE upload body
+    # (bytes bodies don't get it — which is why vast_probe's zero-byte
+    # put_object succeeds while every upload_fileobj dies): the client then
+    # waits for an interim 100 response that gateways frequently mishandle.
+    # Strip it unless $VAST_EXPECT_100=1.
+    expect_100 = os.environ.get("VAST_EXPECT_100", "") in ("1", "true", "yes")
+    if not expect_100:
+        for op in ("PutObject", "UploadPart"):
+            client.meta.events.register(f"request-created.s3.{op}", _strip_expect)
+
+    # One-time wire-format banner so the job log PROVES which client behavior
+    # is deployed (the failures so far were all invisible wire-format issues).
+    if not _WIRE_LOGGED.is_set():
+        _WIRE_LOGGED.set()
+        import botocore
+        checksums = opts.get("request_checksum_calculation", "botocore default")
+        log.info(
+            "[vast] wire config: boto3 %s · botocore %s · request checksums: "
+            "%s · Expect 100-continue: %s · part %d MB · concurrency %d",
+            getattr(boto3, "__version__", "?"),
+            getattr(botocore, "__version__", "?"),
+            checksums, "on" if expect_100 else "stripped",
+            UPLOAD_PART_MB, UPLOAD_CONCURRENCY,
+        )
     return client, s["bucket"]
+
+
+_WIRE_LOGGED = threading.Event()
+
+
+def _strip_expect(request, **_kwargs):
+    if "Expect" in request.headers:
+        del request.headers["Expect"]
 
 
 def _key(table: str) -> str:

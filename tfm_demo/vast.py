@@ -94,27 +94,49 @@ def _client():
     if not _verify():
         import urllib3
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    opts = dict(
+        s3={"addressing_style": "path"},               # required by VAST
+        signature_version="s3v4",
+        retries={"max_attempts": 5, "mode": "standard"},
+        # The pool must fit every concurrent part upload plus the parallel
+        # per-split writers (storage.write_splits), or urllib3 serialises
+        # them again behind pool checkouts.
+        max_pool_connections=max(10, UPLOAD_CONCURRENCY + len(SPLIT_TABLES)),
+        # The path to the endpoint is slow and proxied: keep idle-looking
+        # long transfers alive and don't declare a stall until well past a
+        # slow part's real duration.
+        tcp_keepalive=True,
+        connect_timeout=30,
+        read_timeout=300,
+        # CRITICAL for VAST: botocore >= 1.36 defaults every upload to
+        # aws-chunked encoding with trailing CRC32 checksums, which VAST
+        # releases without trailing-checksum support cannot parse — the
+        # server stalls on the body, then closes the connection ("Connection
+        # was closed before we received a valid response" on plain PutObject
+        # and UploadPart alike). "when_required" restores plain signed bodies.
+        # $VAST_TRAILING_CHECKSUMS=1 re-enables the default for stores that
+        # do support it.
+        request_checksum_calculation="when_required",
+        response_checksum_validation="when_required",
+    )
+    if os.environ.get("VAST_TRAILING_CHECKSUMS", "") in ("1", "true", "yes"):
+        opts.pop("request_checksum_calculation")
+        opts.pop("response_checksum_validation")
+    try:
+        config = Config(**opts)
+    except TypeError:
+        # botocore < 1.36 doesn't know the checksum options — and doesn't
+        # need them (it never sends trailing checksums).
+        opts.pop("request_checksum_calculation", None)
+        opts.pop("response_checksum_validation", None)
+        config = Config(**opts)
     client = boto3.client(
         "s3",
         endpoint_url=s["endpoint"],
         aws_access_key_id=s["access_key"],
         aws_secret_access_key=s["secret_key"],
         region_name=os.environ.get("VAST_REGION", "vast"),
-        config=Config(
-            s3={"addressing_style": "path"},           # required by VAST
-            signature_version="s3v4",
-            retries={"max_attempts": 5, "mode": "standard"},
-            # The pool must fit every concurrent part upload plus the parallel
-            # per-split writers (storage.write_splits), or urllib3 serialises
-            # them again behind pool checkouts.
-            max_pool_connections=max(10, UPLOAD_CONCURRENCY + len(SPLIT_TABLES)),
-            # The path to the endpoint is slow and proxied: keep idle-looking
-            # long transfers alive and don't declare a stall until well past a
-            # slow part's real duration.
-            tcp_keepalive=True,
-            connect_timeout=30,
-            read_timeout=300,
-        ),
+        config=config,
         verify=_verify(),
     )
     return client, s["bucket"]

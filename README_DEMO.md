@@ -85,6 +85,10 @@ Two backends (`tfm_demo/storage.py` dispatches):
   retries with backoff (the endpoint has been seen dropping TLS mid-part).
   Knobs: `$VAST_UPLOAD_PART_MB` (default 8, clamped to S3's 5 MiB minimum),
   `$VAST_UPLOAD_CONCURRENCY` (default 8), `$VAST_UPLOAD_RETRIES` (default 3).
+  Trailing checksums (botocore ≥ 1.36's aws-chunked upload default) are
+  disabled because this VAST release can't parse them — the connection-closed
+  upload failures — set `$VAST_TRAILING_CHECKSUMS=1` only against a store
+  that supports them.
   On a slow/flaky link try `VAST_UPLOAD_PART_MB=5` (smaller parts finish
   before proxy timeouts) and lower concurrency; if multipart itself is the
   problem, a large part size (e.g. 64) forces single PUTs.

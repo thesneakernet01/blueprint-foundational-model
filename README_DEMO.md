@@ -86,9 +86,17 @@ Two backends (`tfm_demo/storage.py` dispatches):
   Knobs: `$VAST_UPLOAD_PART_MB` (default 8, clamped to S3's 5 MiB minimum),
   `$VAST_UPLOAD_CONCURRENCY` (default 8), `$VAST_UPLOAD_RETRIES` (default 3).
   Trailing checksums (botocore ≥ 1.36's aws-chunked upload default) are
-  disabled because this VAST release can't parse them — the connection-closed
-  upload failures — set `$VAST_TRAILING_CHECKSUMS=1` only against a store
-  that supports them.
+  disabled because this VAST release can't parse them; set
+  `$VAST_TRAILING_CHECKSUMS=1` only against a store that supports them.
+  **Broken-endpoint fallback:** the live previewhub VAST hangs on any upload
+  body over exactly 60 KiB (server-side defect — probed and reproduced with
+  curl over HTTP/1.1 and HTTP/2; GETs are healthy). Uploads probe the ceiling
+  once per run and automatically fall back to concurrent ≤60 KiB multipart
+  parts with per-part retries — slow (~10 min/MB observed) but reliable.
+  `$VAST_MAX_BODY_KB` overrides the probe (0 = force the normal fast path,
+  N = force N-KiB parts). Since that VAST also drops user metadata on
+  multipart objects, tiny-part uploads leave a `<split>.parquet.rows` sidecar
+  that the status check falls back to.
   On a slow/flaky link try `VAST_UPLOAD_PART_MB=5` (smaller parts finish
   before proxy timeouts) and lower concurrency; if multipart itself is the
   problem, a large part size (e.g. 64) forces single PUTs.

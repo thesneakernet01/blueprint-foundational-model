@@ -37,6 +37,7 @@ dist/
 .env
 .env.*
 !.env.example
+.vast.env
 
 # OS / editor
 .DS_Store

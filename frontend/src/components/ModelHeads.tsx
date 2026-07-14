@@ -8,17 +8,25 @@ interface Props {
   error: string | null;
 }
 
-const HEADS: { key: 'raw' | 'embed' | 'combined'; label: string; fill: string; text: string }[] = [
+const HEADS: { key: 'raw' | 'embed' | 'combined' | 'nexus'; label: string; fill: string; text: string }[] = [
   { key: 'raw', label: 'Raw features', fill: 'bg-gray-500', text: 'text-gray-200' },
   { key: 'embed', label: 'Embeddings', fill: 'bg-accent', text: 'text-accent' },
   { key: 'combined', label: 'Combined', fill: 'bg-status-amber', text: 'text-status-amber' },
+  { key: 'nexus', label: 'Large Tabular Model', fill: 'bg-status-purple', text: 'text-status-purple' },
 ];
 
 const THRESHOLD = 0.5;
 
-function meta(key: string, summary: Summary | null): string {
+function meta(key: string, summary: Summary | null, result: ScoreResp): string {
   if (key === 'raw') return `P(fraud) · ${summary?.n_raw_features ?? '—'}-d tabular`;
   if (key === 'embed') return `P(fraud) · ${summary?.pca_dim ?? 64}-d PCA embedding`;
+  if (key === 'nexus') {
+    const info = result.nexus;
+    if (info?.status === 'timeout') return 'remote LTM timed out — no score';
+    if (info?.status === 'unavailable') return 'remote LTM unavailable — no score';
+    const lat = info?.latency_ms != null ? ` · ${(info.latency_ms / 1000).toFixed(1)} s remote` : '';
+    return `P(fraud) · raw table → NEXUS${lat}`;
+  }
   return 'P(fraud) · raw + embedding';
 }
 
@@ -28,7 +36,9 @@ export default function ModelHeads({ result, summary, scoring, error }: Props) {
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-sm font-medium text-gray-300">Model heads</h2>
         <span className="text-[10px] uppercase tracking-wider text-gray-500">
-          raw · embeddings · combined
+          {result && 'nexus' in result.scores
+            ? 'raw · embeddings · combined · ltm'
+            : 'raw · embeddings · combined'}
         </span>
       </div>
 
@@ -73,22 +83,24 @@ export default function ModelHeads({ result, summary, scoring, error }: Props) {
       {result && (
         <>
           <div className="space-y-4">
-            {HEADS.map(({ key, label, fill, text }) => {
+            {HEADS.filter(({ key }) => key in result.scores).map(({ key, label, fill, text }) => {
               const p = result.scores[key];
-              const pct = (p * 100).toFixed(1);
+              const pct = typeof p === 'number' ? (p * 100).toFixed(1) : null;
               return (
                 <div key={key}>
                   <div className="flex items-baseline justify-between mb-1.5">
                     <span className="text-xs text-gray-300">{label}</span>
-                    <span className={`font-mono text-base font-medium ${text}`}>{pct}%</span>
+                    <span className={`font-mono text-base font-medium ${pct == null ? 'text-gray-600' : text}`}>
+                      {pct == null ? '—' : `${pct}%`}
+                    </span>
                   </div>
                   <div className="h-2 bg-surface-3 rounded-full overflow-hidden">
                     <div
                       className={`h-full rounded-full ${fill} transition-[width] duration-700 ease-out`}
-                      style={{ width: `${pct}%` }}
+                      style={{ width: `${pct ?? 0}%` }}
                     />
                   </div>
-                  <div className="text-[10px] font-mono text-gray-600 mt-1">{meta(key, summary)}</div>
+                  <div className="text-[10px] font-mono text-gray-600 mt-1">{meta(key, summary, result)}</div>
                 </div>
               );
             })}

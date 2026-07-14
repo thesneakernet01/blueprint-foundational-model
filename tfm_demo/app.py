@@ -20,6 +20,7 @@ faulthandler.enable(file=sys.stderr, all_threads=True)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from . import nexus
 from .config import MODEL_DIR, cors_origins
 from .engine import Engine
 from .jobs import ExportManager, PrepManager
@@ -62,6 +63,7 @@ def create_app() -> FastAPI:
             "gpu": engine.gpu,
             "detail": engine.detail,
             "model_dir": str(MODEL_DIR),
+            "nexus": nexus.mode(),
         })
 
     @app.get("/api/summary")

@@ -16,10 +16,12 @@ export interface StatusResp {
 }
 
 export interface ModelSummary {
-  key: 'raw' | 'embed' | 'combined' | string;
+  key: 'raw' | 'embed' | 'combined' | 'nexus' | string;
   label: string;
   test_auc: number | null;
   test_ap: number | null;
+  /** True when the metrics came from the NEXUS stub, not a real model. */
+  stub?: boolean;
 }
 
 export interface Lift {
@@ -27,6 +29,9 @@ export interface Lift {
   embed_ap_pct: number | null;
   combined_auc_pct: number | null;
   combined_ap_pct: number | null;
+  /** Present only when the NEXUS head ran during the export. */
+  nexus_auc_pct?: number | null;
+  nexus_ap_pct?: number | null;
 }
 
 export interface Summary {
@@ -71,6 +76,15 @@ export interface Scores {
   raw: number;
   embed: number;
   combined: number;
+  /** Key present only when the NEXUS head is configured; null = the remote
+   *  call timed out or failed for this transaction. */
+  nexus?: number | null;
+}
+
+/** NEXUS side-channel riding on the score response (present iff configured). */
+export interface NexusInfo {
+  status: 'ok' | 'timeout' | 'unavailable';
+  latency_ms: number | null;
 }
 
 export interface ScoreResp {
@@ -79,6 +93,7 @@ export interface ScoreResp {
   embedding_dim: number;
   scores: Scores;
   position: { x: number; y: number } | null;
+  nexus?: NexusInfo;
 }
 
 async function getJSON<T>(path: string): Promise<T> {

@@ -21,6 +21,8 @@ export default {
         'status-amber-dim': '#92400e',
         'status-green': '#10b981',
         'status-green-dim': '#065f46',
+        'status-purple': '#a78bfa',
+        'status-purple-dim': '#5b21b6',
       },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',

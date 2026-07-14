@@ -406,6 +406,27 @@ def run_export(progress: Progress = None) -> Dict:
     Xte_c = np.hstack([Xte_raw, Xte_pca])
     clf_comb, auc_comb, ap_comb = fit(XGB_PARAMS_COMBINED, Xtr_c, Xva_c, Xte_c, "combined")
 
+    # ---- optional fourth head: NEXUS Large Tabular Model -------------------
+    # Gets the UNTRANSFORMED raw frames (X_*_raw pandas, not the ordinal-
+    # encoded Xtr_raw matrices) — the LTM's premise is raw tables in, no
+    # feature engineering. Skipped without failing the export, like UMAP.
+    from . import nexus
+    nexus_meta = None
+    if nexus.configured():
+        try:
+            emit(f"Training NEXUS head ({nexus.mode()} mode) ...")
+            nexus_meta = nexus.fit_head(X_train_raw, y_train, X_val_raw, y_val,
+                                        X_test_raw, y_test, progress=emit)
+            emit(f"  nexus: AUC {nexus_meta['test_auc']:.4f} · "
+                 f"AP {nexus_meta['test_ap']:.4f}"
+                 + (" [stub]" if nexus_meta.get("stub") else ""))
+        except Exception as exc:                                   # noqa: BLE001
+            emit(f"(skipping NEXUS head: {exc})")
+            nexus_meta = None
+    else:
+        emit("NEXUS not configured — skipping the Large Tabular Model head "
+             "(set NEXUS_MODE=stub|live to enable).")
+
     # ---- UMAP (live projection + background scatter) ---------------------
     umap_bg = []
     try:
@@ -447,6 +468,12 @@ def run_export(progress: Progress = None) -> Dict:
     joblib.dump(clf_raw, OUT / "xgb_raw.joblib")
     joblib.dump(clf_emb, OUT / "xgb_embed.joblib")
     joblib.dump(clf_comb, OUT / "xgb_combined.joblib")
+    if nexus_meta:
+        (OUT / "nexus.json").write_text(json.dumps(nexus_meta, indent=2))
+    else:
+        # A stale nexus.json from an earlier stub/live export must not leak
+        # into an export where the head didn't run.
+        (OUT / "nexus.json").unlink(missing_ok=True)
     (OUT / "umap_background.json").write_text(json.dumps(umap_bg))
     (OUT / "examples.json").write_text(json.dumps(examples, indent=2))
 
@@ -467,6 +494,14 @@ def run_export(progress: Progress = None) -> Dict:
                  "combined_auc_pct": lift(auc_comb, auc_raw),
                  "combined_ap_pct": lift(ap_comb, ap_raw)},
     }
+    if nexus_meta:
+        summary["models"].append({
+            "key": nexus.NEXUS_KEY, "label": nexus.NEXUS_LABEL,
+            "test_auc": nexus_meta["test_auc"], "test_ap": nexus_meta["test_ap"],
+            "stub": bool(nexus_meta.get("stub")),
+        })
+        summary["lift"]["nexus_auc_pct"] = lift(nexus_meta["test_auc"], auc_raw)
+        summary["lift"]["nexus_ap_pct"] = lift(nexus_meta["test_ap"], ap_raw)
     (OUT / "summary.json").write_text(json.dumps(summary, indent=2))
     emit(f"Done — artifacts written to {OUT}")
     emit(f"Lift (AP): embed {summary['lift']['embed_ap_pct']}% · "

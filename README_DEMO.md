@@ -63,6 +63,14 @@ The top-left badge always tells you what's running:
   with clearly-labelled synthetic scores so you can build/preview the front end
   off-GPU (e.g. on a laptop). Nothing is ever silently faked.
 
+Independently of the mode, a **fourth model card/score bar — NEXUS
+(Fundamental's Large Tabular Model)** — appears when `$NEXUS_MODE` is set:
+a remote foundation model scoring the *raw untransformed transaction*
+("classic GBM vs. TFM-embeddings vs. Large Tabular Model"). It degrades on its
+own (a timed-out remote call shows `—`, never blocks the demo) and REAL mode
+never depends on it. See the NEXUS section under Customising and
+`docs/nexus-ltm-design.md`.
+
 ## Training data · storage (VAST S3 or Impala)
 
 The temporal splits `train`, `val_eval` and `test_eval` live in a storage
@@ -71,35 +79,26 @@ Two backends (`tfm_demo/storage.py` dispatches):
 
 - **VAST S3** (default when configured) — each split is one Parquet object at
   `s3://<bucket>/<prefix>/<split>.parquet`, written and read **directly with
-  boto3**. No warehouse in the path — this exists because the CDW/Impala s3a
-  client is rejected by the VAST endpoint with a bare `400` while the same S3
-  calls succeed via boto3 (see `docs/impala-vast-s3-config.md` and
-  `scripts/vast_probe.py`). Enter endpoint / bucket / folder / keys in the
+  boto3**. The name is historical (the backend originally targeted a VAST Data
+  endpoint; see `docs/impala-vast-s3-config.md` for why the warehouse's s3a
+  path was bypassed) — the store behind it is now a **MinIO bucket**, and the
+  backend is tuned for that. Enter endpoint / bucket / folder / keys in the
   dialog (`$VAST_ENDPOINT`, `$VAST_BUCKET`, `$VAST_PATH`, `$VAST_ACCESS_KEY`,
-  `$VAST_SECRET_KEY` seed the defaults — the same env vars the probe script
-  uses). Path-style addressing and sigv4 are hard-wired; TLS verification is
-  off for the internal-CA endpoint unless `$VAST_VERIFY_SSL=1` (or a CA bundle
-  path). Uploads are parallel twice over — the three splits upload
-  concurrently, and each object bigger than one part is a concurrent multipart
-  upload — and resilient: TCP keepalive, generous timeouts, and whole-upload
-  retries with backoff (the endpoint has been seen dropping TLS mid-part).
-  Knobs: `$VAST_UPLOAD_PART_MB` (default 8, clamped to S3's 5 MiB minimum),
-  `$VAST_UPLOAD_CONCURRENCY` (default 8), `$VAST_UPLOAD_RETRIES` (default 3).
-  Trailing checksums (botocore ≥ 1.36's aws-chunked upload default) are
-  disabled because this VAST release can't parse them; set
-  `$VAST_TRAILING_CHECKSUMS=1` only against a store that supports them.
-  **Broken-endpoint fallback:** the live previewhub VAST hangs on any upload
-  body over exactly 60 KiB (server-side defect — probed and reproduced with
-  curl over HTTP/1.1 and HTTP/2; GETs are healthy). Uploads probe the ceiling
-  once per run and automatically fall back to concurrent ≤60 KiB multipart
-  parts with per-part retries — slow (~10 min/MB observed) but reliable.
-  `$VAST_MAX_BODY_KB` overrides the probe (0 = force the normal fast path,
-  N = force N-KiB parts). Since that VAST also drops user metadata on
-  multipart objects, tiny-part uploads leave a `<split>.parquet.rows` sidecar
-  that the status check falls back to.
-  On a slow/flaky link try `VAST_UPLOAD_PART_MB=5` (smaller parts finish
-  before proxy timeouts) and lower concurrency; if multipart itself is the
-  problem, a large part size (e.g. 64) forces single PUTs.
+  `$VAST_SECRET_KEY` seed the defaults). Path-style addressing and sigv4 are
+  hard-wired (MinIO serves buckets on the path); the region is `us-east-1`
+  unless `$VAST_REGION` overrides; TLS verification is off unless
+  `$VAST_VERIFY_SSL=1` (or a CA bundle path). Uploads are parallel twice
+  over — the three splits upload concurrently, and each object bigger than
+  one part is a concurrent multipart upload — with whole-upload retries on
+  top of botocore's own; reads use concurrent ranged GETs. Row counts are
+  stamped as object metadata (`x-amz-meta-rows`), which MinIO preserves on
+  multipart uploads. Knobs: `$VAST_UPLOAD_PART_MB` (default 64, clamped to
+  S3's 5 MiB minimum), `$VAST_UPLOAD_CONCURRENCY` (default 8),
+  `$VAST_UPLOAD_RETRIES` (default 2). Trailing checksums (botocore ≥ 1.36's
+  aws-chunked upload default) stay on for end-to-end integrity — MinIO
+  supports them; `$VAST_TRAILING_CHECKSUMS=0` disables them, and
+  `$VAST_EXPECT_100=0` strips `Expect: 100-continue`, for stores or gateways
+  that can't cope.
 - **Impala (CDW)** — splits as Impala tables through a **CML data connection**
   (`$IMPALA_CONNECTION_NAME` / `$IMPALA_DATABASE` seed the defaults; outside
   CML, `$IMPALA_HOST` + `_PORT/_USER/_PASSWORD/_AUTH/_SSL/_HTTP` bypasses the
@@ -143,5 +142,16 @@ back on read; Parquet keeps the original names.
 - **Bigger embedding map:** raise `viz_n` in `export_for_demo.py`.
 - **Branding / colours:** the CSS variables at the top of `index.html`
   (`--signal`, `--amber`, fonts) are the whole theme.
+- **NEXUS Large Tabular Model head (`$NEXUS_MODE`):** `off` (default) hides it
+  entirely; `stub` demos the full 4-model path today with deterministic fake
+  scores clearly tagged `stub` (no AWS needed); `live` scores through a
+  pre-deployed SageMaker endpoint — set `$NEXUS_ENDPOINT_NAME`,
+  `$NEXUS_S3_BUCKET` (plus optional `$NEXUS_REGION`, `$NEXUS_S3_PREFIX`,
+  `$NEXUS_SCORE_TIMEOUT_S`, `$NEXUS_TRAIN_MAX`), then re-run the export.
+  **Cost warning:** the NEXUS endpoint is a single-tenant `ml.p5en.48xlarge`
+  (~$60+/hr) — deploy it right before the demo window and delete it right
+  after; this app never creates or deletes endpoints. Live transport ships
+  disabled until Fundamental access lands — run `scripts/nexus_probe.py` and
+  follow the day-one checklist in `docs/nexus-ltm-design.md`.
 
 Built on the NVIDIA AI Blueprint *Transaction Foundation Model* (Apache-2.0).

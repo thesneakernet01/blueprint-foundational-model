@@ -1,9 +1,18 @@
 import { TrendingUp } from 'lucide-react';
-import type { Summary } from '../api';
+import type { Lift, Summary } from '../api';
 
 interface Props {
   summary: Summary | null;
 }
+
+// Per-model card meta, keyed by summary.models[].key — cards render for
+// whichever models the export produced (3 today, 4 with the NEXUS head).
+const META: Record<string, { tag: string; featured: boolean; liftKey?: keyof Lift }> = {
+  raw: { tag: 'baseline', featured: false },
+  embed: { tag: 'foundation model', featured: true, liftKey: 'embed_ap_pct' },
+  combined: { tag: 'raw + embeddings', featured: false, liftKey: 'combined_ap_pct' },
+  nexus: { tag: 'large tabular model', featured: true, liftKey: 'nexus_ap_pct' },
+};
 
 const fmt = (v: number | null) => (v == null ? '—' : v.toFixed(4));
 const liftStr = (v: number | null) => (v == null ? '' : `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`);
@@ -28,16 +37,22 @@ export default function MetricsStrip({ summary }: Props) {
     );
   }
 
-  const byKey = Object.fromEntries(summary.models.map((m) => [m.key, m]));
-  const cards = [
-    { m: byKey.raw, tag: 'baseline', lift: null as number | null, featured: false },
-    { m: byKey.embed, tag: 'foundation model', lift: summary.lift.embed_ap_pct, featured: true },
-    { m: byKey.combined, tag: 'raw + embeddings', lift: summary.lift.combined_ap_pct, featured: false },
-  ];
+  const cards = summary.models
+    .filter((m) => META[m.key])
+    .map((m) => {
+      const { tag, featured, liftKey } = META[m.key];
+      return {
+        m,
+        tag: m.stub ? `${tag} · stub` : tag,
+        lift: liftKey ? (summary.lift[liftKey] ?? null) : null,
+        featured,
+      };
+    });
+  const grid = cards.length > 3 ? 'sm:grid-cols-2 xl:grid-cols-4' : 'sm:grid-cols-3';
 
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className={`grid grid-cols-1 ${grid} gap-4`}>
         {cards.map(({ m, tag, lift, featured }) => (
           <div
             key={m.key}

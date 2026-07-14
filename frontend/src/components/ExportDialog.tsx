@@ -137,7 +137,8 @@ export default function ExportDialog({ open, onClose, onExported }: Props) {
         {/* body */}
         <div className="p-5 space-y-4 overflow-y-auto">
           <p className="text-xs text-gray-400 leading-relaxed">
-            Trains the three XGBoost heads, fits PCA + UMAP on the foundation-model
+            Trains the XGBoost heads (plus the NEXUS Large Tabular Model head when
+            configured), fits PCA + UMAP on the foundation-model
             embeddings, and writes <span className="font-mono text-gray-300">demo_artifacts/</span> on
             the backend. Reads the training splits from the configured Impala database
             (see the Data dialog) and generates the foundation-model embeddings in-app —
@@ -195,6 +196,12 @@ export default function ExportDialog({ open, onClose, onExported }: Props) {
                 <Stat label="Combined AP lift" value={lift.combined_ap_pct} />
                 <Stat label="Embeddings AUC lift" value={lift.embed_auc_pct} />
                 <Stat label="Combined AUC lift" value={lift.combined_auc_pct} />
+                {lift.nexus_ap_pct !== undefined && (
+                  <Stat label="NEXUS AP lift" value={lift.nexus_ap_pct} />
+                )}
+                {lift.nexus_auc_pct !== undefined && (
+                  <Stat label="NEXUS AUC lift" value={lift.nexus_auc_pct} />
+                )}
               </div>
             </div>
           )}

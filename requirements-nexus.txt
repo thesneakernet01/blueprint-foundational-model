@@ -1,0 +1,10 @@
+# NEXUS (Fundamental Large Tabular Model) SDK — day-one-of-access item.
+#
+# The exact pip package name is unknown until Fundamental access lands.
+# When it does: pin it here, wire the real import in tfm_demo/nexus.py:_sdk(),
+# and run scripts/nexus_probe.py. See docs/nexus-ltm-design.md.
+#
+# Not installed by scripts/install_deps.py — the off/stub modes need nothing
+# beyond boto3 (already in requirements-demo.txt).
+#
+# fundamental-nexus==?.?.?

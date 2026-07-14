@@ -7,8 +7,12 @@ present; otherwise DEMO-FALLBACK with clearly-labelled synthetic scores.
 from __future__ import annotations
 
 import json
-from typing import Dict, List
+import time
+from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeout
+from typing import Dict, List, Optional, Tuple
 
+from . import nexus
 from .config import (
     ARTIFACTS,
     MAX_LENGTH,
@@ -20,6 +24,17 @@ from .config import (
 )
 from .defaults import builtin_examples, builtin_summary
 
+# Remote NEXUS calls run off-thread so the local pipeline never waits on the
+# network; created lazily so an unconfigured app spawns no threads.
+_NEXUS_POOL: Optional[ThreadPoolExecutor] = None
+
+
+def _nexus_pool() -> ThreadPoolExecutor:
+    global _NEXUS_POOL
+    if _NEXUS_POOL is None:
+        _NEXUS_POOL = ThreadPoolExecutor(max_workers=2, thread_name_prefix="nexus")
+    return _NEXUS_POOL
+
 
 class Engine:
     def __init__(self) -> None:
@@ -29,6 +44,7 @@ class Engine:
         self.summary: Dict = {}
         self.examples: List[Dict] = []
         self.umap_background: List[Dict] = []
+        self.nexus_meta: Dict = {}
         self._ready = False
 
         # heavy objects (real mode only)
@@ -59,10 +75,14 @@ class Engine:
         """summary / examples / umap background are cheap JSON — load if present."""
         import numpy as np
         self._np = np
+        # A re-warmup after an export where the NEXUS head didn't run must
+        # drop the previous run's reference, not keep serving it.
+        self.nexus_meta = {}
         for name, attr, _default in [
             ("summary.json", "summary", {}),
             ("examples.json", "examples", []),
             ("umap_background.json", "umap_background", []),
+            ("nexus.json", "nexus_meta", {}),
         ]:
             p = ARTIFACTS / name
             if p.exists():
@@ -137,7 +157,10 @@ class Engine:
         )                                                             # (1, 512)
         return emb, tokens
 
-    def _raw_vector(self, txn: Dict):
+    def _raw_frame(self, txn: Dict):
+        """The single-row UNTRANSFORMED raw-feature frame (numeric coercions
+        applied, sklearn preprocessor not) — what the NEXUS head scores and
+        what `_raw_vector` feeds to the fitted preprocessor."""
         import pandas as pd
         row = {c: txn.get(c) for c in RAW_FEATURE_COLS}
         # numeric coercions matching NB05 feature engineering
@@ -160,12 +183,49 @@ class Engine:
             row["Zip"] = float(str(row.get("Zip", "")).strip() or 0)
         except ValueError:
             row["Zip"] = 0.0
-        df = pd.DataFrame([row], columns=RAW_FEATURE_COLS)
-        return self._preproc.transform(df)
+        return pd.DataFrame([row], columns=RAW_FEATURE_COLS)
+
+    def _raw_vector(self, txn: Dict):
+        return self._preproc.transform(self._raw_frame(txn))
+
+    # -- NEXUS fourth head (remote; additive, null-safe, never blocks long) ---
+    def _nexus_submit(self, txn: Dict) -> Optional[Tuple[Future, float]]:
+        """Fire the remote NEXUS score before the local pipeline runs, so the
+        two overlap. None when the head is off — the response then carries no
+        nexus keys at all."""
+        if not nexus.configured():
+            return None
+        try:
+            frame = self._raw_frame(txn)
+        except Exception as exc:                                   # noqa: BLE001
+            log.warning("[nexus] could not build raw frame: %s", exc)
+            return None
+        t0 = time.perf_counter()
+        return _nexus_pool().submit(nexus.score_one, frame, self.nexus_meta), t0
+
+    def _nexus_harvest(self, submitted: Tuple[Future, float]):
+        """(score|None, status side-channel) within the scoring budget. A
+        timed-out call finishes harmlessly on the pool thread."""
+        future, t0 = submitted
+        try:
+            p = future.result(timeout=nexus.score_timeout_s())
+        except FutureTimeout:
+            return None, {"status": "timeout", "latency_ms": None}
+        except Exception:                                          # noqa: BLE001
+            p = None
+        latency = round((time.perf_counter() - t0) * 1000, 1)
+        if p is None:
+            return None, {"status": "unavailable", "latency_ms": None}
+        return p, {"status": "ok", "latency_ms": latency}
 
     def score(self, txn: Dict) -> Dict:
-        if self.mode != "real":
-            return self._score_fallback(txn)
+        submitted = self._nexus_submit(txn)
+        out = self._score_real(txn) if self.mode == "real" else self._score_fallback(txn)
+        if submitted is not None:
+            out["scores"]["nexus"], out["nexus"] = self._nexus_harvest(submitted)
+        return out
+
+    def _score_real(self, txn: Dict) -> Dict:
         np = self._np
         emb, tokens = self._embed_one(txn)
         emb_pca = self._pca.transform(emb)                            # (1, 64)

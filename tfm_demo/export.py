@@ -436,7 +436,15 @@ def run_export(progress: Progress = None) -> Dict:
         np.random.seed(42)
         idx = np.random.choice(len(X_test_e), viz_n, replace=False)
         umap = cumlUMAP(n_neighbors=15, n_components=2, min_dist=0.1, random_state=42)
-        coords = cp.asnumpy(umap.fit_transform(cp.asarray(X_test_e[idx])))
+        pts = cp.asarray(X_test_e[idx])
+        umap.fit(pts)
+        # The background MUST be projected with transform(), not taken from
+        # fit_transform(): the live "This transaction" dot is placed with
+        # umap.transform() at scoring time (engine.score), and cuML does not
+        # guarantee transform() shares fit_transform()'s orientation — the
+        # fitted embedding can come out mirrored, which stranded the live dot
+        # on the opposite side of the map. One operator, one coordinate frame.
+        coords = cp.asnumpy(umap.transform(pts))
         joblib.dump(umap, OUT / "umap2d.joblib")
         umap_bg = [{"x": float(c[0]), "y": float(c[1]), "fraud": int(y_test[idx][i])}
                    for i, c in enumerate(coords)]

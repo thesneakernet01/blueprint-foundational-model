@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
-"""VAST S3 data layer — the temporal splits live as Parquet objects on VAST,
-written and read directly with boto3 (no Impala/s3a in the path).
-
-Why this exists: the CDW Impala warehouse could not be pointed at VAST — its
-Java s3a client gets a bare "400 null" from the endpoint on every table-storage
-call, while the exact same S3 API sequence succeeds via boto3 (proven by
-scripts/vast_probe.py). So this backend skips the warehouse entirely.
+"""VAST S3 data layer — the temporal splits live as Parquet objects on the
+"VAST" S3 target, written and read directly with boto3 (no Impala/s3a in the
+path). The name is historical: the store behind it is now a MinIO bucket, and
+this module is tuned for that — the original VAST Data endpoint's defects
+(60 KiB upload-body cap, dropped multipart metadata, no trailing-checksum
+support) and their workarounds (tiny-part uploads, `.rows` sidecars, stripped
+checksums/Expect headers) are gone.
 
 Layout: one object per split at  s3://<bucket>/<prefix>/<table>.parquet  with
 the table names shared with the Impala backend (train / val_eval / test_eval).
@@ -16,11 +16,16 @@ what the row-position-keyed embedding cache requires.
 
 The row count is stamped on each object as S3 user metadata (x-amz-meta-rows)
 so check() can report table sizes from a HeadObject instead of downloading.
+MinIO preserves user metadata on multipart uploads, so this works for every
+object size.
 
-VAST specifics (same as the probe): path-style addressing, sigv4, region
-literal "vast" ($VAST_REGION overrides), and an internal-CA TLS cert — so
-certificate verification is OFF unless $VAST_VERIFY_SSL=1 (or it names a CA
-bundle file).
+MinIO specifics: path-style addressing (MinIO serves buckets on the path, not
+virtual hosts), sigv4, region defaults to MinIO's "us-east-1" ($VAST_REGION
+overrides). TLS verification is OFF unless $VAST_VERIFY_SSL=1 (or it names a
+CA bundle file) — self-hosted MinIO frequently runs on an internal CA.
+Trailing checksums (botocore >= 1.36's aws-chunked CRC32 default) stay ON for
+end-to-end integrity — MinIO supports them; $VAST_TRAILING_CHECKSUMS=0 turns
+them off for stores that don't.
 """
 
 from __future__ import annotations
@@ -43,35 +48,17 @@ SPLIT_TABLES = {"train": "train", "val": "val_eval", "test": "test_eval"}
 ROW_GROUP_ROWS = int(os.environ.get("VAST_ROW_GROUP_ROWS", "250000"))
 _ROWS_META = "rows"
 
-# Upload transfer tuning. previewhub is a high-latency WAN endpoint, so
-# throughput comes from parts in flight, not from a single stream: files above
-# the part size are split into part-size chunks PUT concurrently. Anything at
-# or below one part goes as a single PUT — multipart's initiate/complete
-# round-trips are pure overhead there (boto3's 8 MB default turned an 11 MB
-# upload into a 2-part multipart: all the overhead, no parallelism).
-# Part size is clamped to S3's 5 MiB minimum for non-final parts; smaller
-# parts survive flaky/slow paths better (each finishes before proxy send
-# timeouts — the live failure was an SSLEOFError mid-part), bigger parts have
-# less per-request overhead.
-UPLOAD_PART_MB = max(5, int(os.environ.get("VAST_UPLOAD_PART_MB", "8")))
+# Transfer tuning, sized for MinIO on a fast link: big parts keep per-request
+# overhead low, and a single stream usually saturates a LAN — the concurrency
+# is there for high-latency paths and for stacking the three split uploads.
+# Anything at or below one part goes as a single PUT: multipart's
+# initiate/complete round-trips are pure overhead there. Part size is clamped
+# to S3's 5 MiB minimum for non-final parts.
+UPLOAD_PART_MB = max(5, int(os.environ.get("VAST_UPLOAD_PART_MB", "64")))
 UPLOAD_CONCURRENCY = int(os.environ.get("VAST_UPLOAD_CONCURRENCY", "8"))
-# Whole-upload retries: the endpoint has been seen closing TLS mid-part
-# (SSLEOFError) after botocore's own per-request retries are spent, so each
-# split upload restarts from the buffered Parquet bytes with backoff.
-UPLOAD_RETRIES = int(os.environ.get("VAST_UPLOAD_RETRIES", "3"))
-
-# --- broken-endpoint fallback: tiny-part uploads ----------------------------
-# The live endpoint (s3.previewhub.dev, VAST 5.4.3.1, probed 2026-07-08) hangs
-# or 500s on EVERY upload body over exactly 61,440 bytes (60 KiB) — boto3 and
-# curl alike, HTTP/1.1 and HTTP/2 — while bodies at/below 60 KiB succeed with
-# ~10% random timeouts, and GETs are fast and healthy. That is a server-side
-# defect; until the admin fixes it, uploads can fall back to multipart with
-# ≤60 KiB parts (spec-undersized, but this store accepts them) sent
-# concurrently with per-part retries.
-# $VAST_MAX_BODY_KB: unset = probe the endpoint once per process and fall back
-# automatically; 0 = never use tiny parts; N = force tiny parts of N KiB.
-PART_RETRIES = int(os.environ.get("VAST_PART_RETRIES", "4"))
-_TINY_LIMIT_DEFAULT_KB = 60
+# Whole-upload retries on top of botocore's per-request retries: cheap
+# insurance, the Parquet bytes are already buffered.
+UPLOAD_RETRIES = int(os.environ.get("VAST_UPLOAD_RETRIES", "2"))
 
 Progress = Optional[Callable[[str], None]]
 
@@ -86,7 +73,11 @@ def _verify():
     return True if v in ("1", "true", "yes") else v    # else: a CA bundle path
 
 
-def _client(read_timeout: int = 300, attempts: int = 5):
+def _env_off(name: str) -> bool:
+    return os.environ.get(name, "").lower() in ("0", "false", "no")
+
+
+def _client(read_timeout: int = 120, attempts: int = 5):
     try:
         import boto3
         from botocore.config import Config
@@ -108,33 +99,22 @@ def _client(read_timeout: int = 300, attempts: int = 5):
         import urllib3
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     opts = dict(
-        s3={"addressing_style": "path"},               # required by VAST
+        s3={"addressing_style": "path"},               # MinIO wants path-style
         signature_version="s3v4",
         retries={"max_attempts": attempts, "mode": "standard"},
-        # The pool must fit every concurrent part upload plus the parallel
+        # The pool must fit every concurrent part transfer plus the parallel
         # per-split writers (storage.write_splits), or urllib3 serialises
         # them again behind pool checkouts.
         max_pool_connections=max(10, UPLOAD_CONCURRENCY + len(SPLIT_TABLES)),
-        # The path to the endpoint is slow and proxied: keep idle-looking
-        # long transfers alive and don't declare a stall until well past a
-        # slow part's real duration.
         tcp_keepalive=True,
-        connect_timeout=30,
+        connect_timeout=10,
         read_timeout=read_timeout,
-        # CRITICAL for VAST: botocore >= 1.36 defaults every upload to
-        # aws-chunked encoding with trailing CRC32 checksums, which VAST
-        # releases without trailing-checksum support cannot parse — the
-        # server stalls on the body, then closes the connection ("Connection
-        # was closed before we received a valid response" on plain PutObject
-        # and UploadPart alike). "when_required" restores plain signed bodies.
-        # $VAST_TRAILING_CHECKSUMS=1 re-enables the default for stores that
-        # do support it.
-        request_checksum_calculation="when_required",
-        response_checksum_validation="when_required",
     )
-    if os.environ.get("VAST_TRAILING_CHECKSUMS", "") in ("1", "true", "yes"):
-        opts.pop("request_checksum_calculation")
-        opts.pop("response_checksum_validation")
+    if _env_off("VAST_TRAILING_CHECKSUMS"):
+        # Escape hatch for stores that can't parse aws-chunked trailing
+        # checksums (the original VAST endpoint couldn't): plain signed bodies.
+        opts["request_checksum_calculation"] = "when_required"
+        opts["response_checksum_validation"] = "when_required"
     try:
         config = Config(**opts)
     except TypeError:
@@ -148,33 +128,29 @@ def _client(read_timeout: int = 300, attempts: int = 5):
         endpoint_url=s["endpoint"],
         aws_access_key_id=s["access_key"],
         aws_secret_access_key=s["secret_key"],
-        region_name=os.environ.get("VAST_REGION", "vast"),
+        region_name=os.environ.get("VAST_REGION", "us-east-1"),
         config=config,
         verify=_verify(),
     )
 
-    # botocore stamps `Expect: 100-continue` on every FILE-LIKE upload body
-    # (bytes bodies don't get it — which is why vast_probe's zero-byte
-    # put_object succeeds while every upload_fileobj dies): the client then
-    # waits for an interim 100 response that gateways frequently mishandle.
-    # Strip it unless $VAST_EXPECT_100=1.
-    expect_100 = os.environ.get("VAST_EXPECT_100", "") in ("1", "true", "yes")
-    if not expect_100:
+    # $VAST_EXPECT_100=0 strips botocore's `Expect: 100-continue` from upload
+    # requests — only needed behind gateways that mishandle the interim
+    # response (MinIO itself is fine with it).
+    if _env_off("VAST_EXPECT_100"):
         for op in ("PutObject", "UploadPart"):
             client.meta.events.register(f"request-created.s3.{op}", _strip_expect)
 
-    # One-time wire-format banner so the job log PROVES which client behavior
-    # is deployed (the failures so far were all invisible wire-format issues).
+    # One-time wire-format banner so the job log shows which client behavior
+    # is deployed.
     if not _WIRE_LOGGED.is_set():
         _WIRE_LOGGED.set()
         import botocore
-        checksums = opts.get("request_checksum_calculation", "botocore default")
         log.info(
-            "[vast] wire config: boto3 %s · botocore %s · request checksums: "
-            "%s · Expect 100-continue: %s · part %d MB · concurrency %d",
+            "[vast] wire config: boto3 %s · botocore %s · trailing checksums: "
+            "%s · part %d MB · concurrency %d",
             getattr(boto3, "__version__", "?"),
             getattr(botocore, "__version__", "?"),
-            checksums, "on" if expect_100 else "stripped",
+            "off" if _env_off("VAST_TRAILING_CHECKSUMS") else "on",
             UPLOAD_PART_MB, UPLOAD_CONCURRENCY,
         )
     return client, s["bucket"]
@@ -188,6 +164,19 @@ def _strip_expect(request, **_kwargs):
         del request.headers["Expect"]
 
 
+def _transfer_config():
+    from boto3.s3.transfer import TransferConfig
+
+    part = UPLOAD_PART_MB << 20
+    return TransferConfig(
+        # threshold > part size: a file of exactly one part stays a single
+        # PUT/GET instead of a 1-part multipart.
+        multipart_threshold=part + 1,
+        multipart_chunksize=part,
+        max_concurrency=UPLOAD_CONCURRENCY,
+    )
+
+
 def _key(table: str) -> str:
     prefix = get_vast_settings()["prefix"]
     return f"{prefix}/{table}.parquet" if prefix else f"{table}.parquet"
@@ -198,126 +187,6 @@ def target() -> str:
     s = get_vast_settings()
     path = f"{s['bucket']}/{s['prefix']}" if s["prefix"] else s["bucket"]
     return f"s3://{path} @ {s['endpoint'] or '<no endpoint>'}"
-
-
-# --------------------------------------------------------------------------- #
-# body-size-limit probe (broken-endpoint detection)
-# --------------------------------------------------------------------------- #
-_BODY_LIMIT_KB: Optional[int] = None       # None = not probed; 0 = no limit
-_PROBE_LOCK = threading.Lock()
-
-
-def _body_limit_kb(emit: Callable[[str], None]) -> int:
-    """The endpoint's upload-body ceiling in KiB (0 = none). $VAST_MAX_BODY_KB
-    overrides; otherwise probed ONCE per process with a 100 KiB test PUT so a
-    healthy endpoint pays two quick requests, not a broken-path stall."""
-    global _BODY_LIMIT_KB
-    env = os.environ.get("VAST_MAX_BODY_KB", "").strip()
-    if env:
-        return max(0, int(env))
-    with _PROBE_LOCK:
-        if _BODY_LIMIT_KB is not None:
-            return _BODY_LIMIT_KB
-        client, bucket = _client(read_timeout=20, attempts=1)
-        prefix = get_vast_settings()["prefix"]
-        key = f"{prefix}/.upload_probe" if prefix else ".upload_probe"
-
-        def _puts(n: int, tries: int = 2) -> bool:
-            for _ in range(tries):        # 2 tries: rides out the ~10% flakiness
-                try:
-                    client.put_object(Bucket=bucket, Key=key, Body=os.urandom(n))
-                    return True
-                except Exception:                                  # noqa: BLE001
-                    pass
-            return False
-
-        if _puts(100 << 10):
-            _BODY_LIMIT_KB = 0
-        elif _puts(_TINY_LIMIT_DEFAULT_KB << 10):
-            _BODY_LIMIT_KB = _TINY_LIMIT_DEFAULT_KB
-            emit(f"  endpoint rejects upload bodies over ~{_BODY_LIMIT_KB} KiB "
-                 "(server-side defect — report to the VAST admin); falling "
-                 "back to tiny-part uploads")
-        else:
-            _BODY_LIMIT_KB = _TINY_LIMIT_DEFAULT_KB
-            emit("  upload probes failed outright — assuming a "
-                 f"{_BODY_LIMIT_KB} KiB body cap and relying on per-part retries")
-        try:
-            client.delete_object(Bucket=bucket, Key=key)
-        except Exception:                                          # noqa: BLE001
-            pass
-        return _BODY_LIMIT_KB
-
-
-def _upload_tiny_parts(client, bucket: str, key: str, data, meta: Dict[str, str],
-                       part_bytes: int, emit, table: str) -> None:
-    """Multipart upload with spec-undersized parts (each ≤ the endpoint's body
-    cap), concurrent with per-part retries. `data` is a buffer/memoryview."""
-    from concurrent.futures import ThreadPoolExecutor
-
-    total = math.ceil(len(data) / part_bytes)
-    if total > 800:
-        # CompleteMultipartUpload's XML body grows ~90 bytes per part and must
-        # itself fit under the endpoint's body cap.
-        emit(f"  {table}: WARNING {total} parts — the multipart-complete "
-             "request may exceed the endpoint's body cap")
-    mp = client.create_multipart_upload(Bucket=bucket, Key=key, Metadata=meta)
-    uid = mp["UploadId"]
-    done, retried = [0], [0]
-    lock = threading.Lock()
-
-    def _send(i: int) -> Dict:
-        body = bytes(data[i * part_bytes:(i + 1) * part_bytes])
-        last: Exception = RuntimeError("unreachable")
-        for attempt in range(PART_RETRIES + 1):
-            try:
-                r = client.upload_part(Bucket=bucket, Key=key, UploadId=uid,
-                                       PartNumber=i + 1, Body=body)
-                with lock:
-                    done[0] += 1
-                    d = done[0]
-                if d % 25 == 0 or d == total:
-                    emit(f"  {table}: {d}/{total} parts uploaded")
-                return {"PartNumber": i + 1, "ETag": r["ETag"]}
-            except Exception as exc:                               # noqa: BLE001
-                last = exc
-                with lock:
-                    retried[0] += 1
-                time.sleep(min(2 ** attempt, 10))
-        raise last
-
-    try:
-        with ThreadPoolExecutor(max_workers=min(UPLOAD_CONCURRENCY, total),
-                                thread_name_prefix=f"vast-{table}") as pool:
-            parts = list(pool.map(_send, range(total)))
-        client.complete_multipart_upload(
-            Bucket=bucket, Key=key, UploadId=uid,
-            MultipartUpload={"Parts": parts})
-    except Exception:
-        try:
-            client.abort_multipart_upload(Bucket=bucket, Key=key, UploadId=uid)
-        except Exception:                                          # noqa: BLE001
-            pass
-        raise
-    if retried[0]:
-        emit(f"  {table}: done ({retried[0]} part retries along the way)")
-
-    # The live VAST drops user metadata on multipart uploads, which would lose
-    # the row-count stamp and make check()/splits_ready() read the split as
-    # empty — so tiny-part objects get a sidecar (<key>.rows) that check()
-    # falls back to. Small body, so it fits under the same cap.
-    rows_body = meta.get(_ROWS_META, "").encode()
-    last: Optional[Exception] = None
-    for attempt in range(PART_RETRIES + 1):
-        try:
-            client.put_object(Bucket=bucket, Key=key + ".rows", Body=rows_body)
-            return
-        except Exception as exc:                                   # noqa: BLE001
-            last = exc
-            time.sleep(min(2 ** attempt, 10))
-    raise RuntimeError(
-        f"upload of {key} succeeded but its .rows sidecar did not: {last}"
-    ) from last
 
 
 # --------------------------------------------------------------------------- #
@@ -341,30 +210,12 @@ def write_split(df, split: str, progress: Progress = None) -> int:
         buf, row_group_size=ROW_GROUP_ROWS, compression="snappy",
     )
     size = buf.tell()
-    buf.seek(0)
-
-    from boto3.s3.transfer import TransferConfig
 
     meta = {_ROWS_META: str(len(df))}
-    limit_kb = _body_limit_kb(emit)
-
-    if limit_kb:
-        # Broken-endpoint path: bodies over limit_kb KiB hang server-side, so
-        # ship the object as concurrent tiny multipart parts (per-part retries
-        # inside). Short per-request timeout — a part either lands in seconds
-        # or never.
-        part = limit_kb << 10
-        tiny_client, _ = _client(read_timeout=45, attempts=1)
-        n_parts = max(1, math.ceil(size / part))
-        emit(f"  {table}: uploading {size / 1e6:.1f} MB to s3://{bucket}/{key} "
-             f"as {n_parts} part(s) × {limit_kb} KiB (endpoint body cap, "
-             f"concurrency {min(n_parts, UPLOAD_CONCURRENCY)}) ...")
-    else:
-        part = UPLOAD_PART_MB << 20
-        n_parts = max(1, math.ceil(size / part))
-        emit(f"  {table}: uploading {size / 1e6:.1f} MB to s3://{bucket}/{key} "
-             f"({n_parts} part(s) × {UPLOAD_PART_MB} MB, "
-             f"concurrency {min(n_parts, UPLOAD_CONCURRENCY)}) ...")
+    n_parts = max(1, math.ceil(size / (UPLOAD_PART_MB << 20)))
+    emit(f"  {table}: uploading {size / 1e6:.1f} MB to s3://{bucket}/{key} "
+         f"({n_parts} part(s) × {UPLOAD_PART_MB} MB, "
+         f"concurrency {min(n_parts, UPLOAD_CONCURRENCY)}) ...")
 
     sent = [0]
     lock = threading.Lock()                           # parts complete on worker threads
@@ -381,26 +232,12 @@ def write_split(df, split: str, progress: Progress = None) -> int:
         buf.seek(0)
         sent[0] = 0
         try:
-            if limit_kb and size > part:
-                _upload_tiny_parts(tiny_client, bucket, key, buf.getbuffer(),
-                                   meta, part, emit, table)
-            elif limit_kb:
-                # Small enough for one capped PUT; bytes body (no Expect).
-                tiny_client.put_object(Bucket=bucket, Key=key,
-                                       Body=buf.getvalue(), Metadata=meta)
-            else:
-                client.upload_fileobj(
-                    buf, bucket, key,
-                    ExtraArgs={"Metadata": meta},
-                    Callback=_cb,
-                    Config=TransferConfig(
-                        # threshold > part size: a file of exactly one part
-                        # stays a single PUT instead of a 1-part multipart.
-                        multipart_threshold=part + 1,
-                        multipart_chunksize=part,
-                        max_concurrency=UPLOAD_CONCURRENCY,
-                    ),
-                )
+            client.upload_fileobj(
+                buf, bucket, key,
+                ExtraArgs={"Metadata": meta},
+                Callback=_cb,
+                Config=_transfer_config(),
+            )
             break
         except Exception as exc:                                   # noqa: BLE001
             if attempt == UPLOAD_RETRIES:
@@ -420,24 +257,26 @@ def read_split_cudf(split: str, columns: Sequence[str]):
     """Fetch a split's Parquet object and return ONE cuDF frame (original
     column names, write order).
 
-    The object is buffered on the host (tens of MB — far below what the ingest
-    already holds), then decoded row-group by row-group with each chunk pushed
-    to the GPU immediately, so decoded host memory stays one row group deep.
+    The object is buffered on the host via concurrent ranged GETs (tens of MB —
+    far below what the ingest already holds), then decoded row-group by
+    row-group with each chunk pushed to the GPU immediately, so decoded host
+    memory stays one row group deep.
     """
     import cudf
     import pyarrow.parquet as pq
 
     client, bucket = _client()
     key = _key(SPLIT_TABLES[split])
+    buf = io.BytesIO()
     try:
-        body = client.get_object(Bucket=bucket, Key=key)["Body"]
+        client.download_fileobj(bucket, key, buf, Config=_transfer_config())
     except Exception as exc:                                       # noqa: BLE001
         raise RuntimeError(
             f"VAST split object s3://{bucket}/{key} is missing or unreadable "
             f"({_first_line(exc)}) — run the data load from the UI's Data "
             "dialog (or scripts/prepare_data.py) first."
         ) from exc
-    buf = io.BytesIO(body.read())
+    buf.seek(0)
 
     pf = pq.ParquetFile(buf)
     cols = list(columns)
@@ -474,7 +313,7 @@ def check() -> Dict:
         "tables": {t: None for t in SPLIT_TABLES.values()},
     }
     try:
-        client, bucket = _client()
+        client, bucket = _client(read_timeout=30)
         client.head_bucket(Bucket=bucket)
         for table in SPLIT_TABLES.values():
             try:
@@ -482,15 +321,6 @@ def check() -> Dict:
             except Exception:                                      # noqa: BLE001
                 continue                                           # missing split
             rows = (head.get("Metadata") or {}).get(_ROWS_META)
-            if not (rows and rows.isdigit()):
-                # Multipart uploads lose user metadata on the live VAST —
-                # tiny-part writes leave a .rows sidecar instead.
-                try:
-                    body = client.get_object(Bucket=bucket,
-                                             Key=_key(table) + ".rows")["Body"]
-                    rows = body.read().decode().strip()
-                except Exception:                                  # noqa: BLE001
-                    rows = None
             out["tables"][table] = int(rows) if rows and rows.isdigit() else 0
         out["ok"] = True
     except Exception as exc:                                       # noqa: BLE001

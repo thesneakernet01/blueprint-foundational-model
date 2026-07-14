@@ -10,6 +10,9 @@ import TransactionComposer, {
 import ModelHeads from './components/ModelHeads';
 import ExportDialog from './components/ExportDialog';
 import DataDialog from './components/DataDialog';
+import clouderaLogo from './assets/partners/cloudera-white.png';
+import vastLogo from './assets/partners/vast-white.svg';
+import fundamentalLogo from './assets/partners/fundamental-white.png';
 
 // Recharts is heavy and only the embedding map needs it — load it in its own
 // chunk so the first paint (header / composer / heads) isn't blocked on it.
@@ -117,6 +120,16 @@ export default function App() {
           </Suspense>
         </div>
       </main>
+
+      {/* partner strip — bottom right */}
+      <footer className="px-4 sm:px-6 lg:px-8 pb-4 max-w-[1400px] w-full mx-auto">
+        <div className="flex items-center justify-end gap-7">
+          <span className="text-[9px] uppercase tracking-[0.2em] text-gray-600">powered by</span>
+          <img src={clouderaLogo} alt="Cloudera" className="h-4 opacity-60 hover:opacity-100 transition-opacity" />
+          <img src={vastLogo} alt="VAST Data" className="h-[15px] opacity-60 hover:opacity-100 transition-opacity" />
+          <img src={fundamentalLogo} alt="Fundamental (NEXUS)" className="h-[18px] opacity-60 hover:opacity-100 transition-opacity" />
+        </div>
+      </footer>
 
       <ExportDialog
         open={exportOpen}

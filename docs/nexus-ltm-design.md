@@ -26,6 +26,13 @@ SDK or reads `NEXUS_*` env vars. Three modes via `$NEXUS_MODE`:
 | `stub` | deterministic fake scores + canned metrics, flagged `"stub": true` end-to-end — demos the full path with zero AWS |
 | `live` | real SDK against a pre-deployed SageMaker endpoint |
 
+The mode is switchable from the UI (Build-artifacts dialog → off/stub/live
+selector → `GET/POST /api/nexus`), persisted in `.nexus_settings.json`
+(gitignored). A UI choice wins over `$NEXUS_MODE`; both export and scoring
+read the mode per use, so changes apply without a restart. The rest of the
+config (endpoint, bucket, timeouts) stays env-only — live mode's selector
+button is locked until `NEXUS_ENDPOINT_NAME` + `NEXUS_S3_BUCKET` are set.
+
 Integration points (all additive, all skip cleanly when unconfigured):
 
 - **Export** (`tfm_demo/export.py`): after the three XGBoost heads, `nexus.fit_head()`

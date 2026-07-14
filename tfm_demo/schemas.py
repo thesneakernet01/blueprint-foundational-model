@@ -61,3 +61,9 @@ class DataConfig(BaseModel):
     backend: str = Field("impala", description="'impala' or 'vast'")
     impala: ImpalaConfig = Field(default_factory=ImpalaConfig)
     vast: VastConfig = Field(default_factory=VastConfig)
+
+
+class NexusConfig(BaseModel):
+    """NEXUS head mode as set from the UI (Build-artifacts dialog)."""
+
+    mode: str = Field("off", description="'off', 'stub' or 'live'")

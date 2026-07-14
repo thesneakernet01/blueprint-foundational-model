@@ -11,10 +11,12 @@ audience. Companion docs: `docs/nexus-ltm-design.md` (NEXUS integration),
 2. **Run one full Build artifacts** — the first export spends most of its time
    generating embeddings on the GPU; they're cached per data-target
    afterwards, so the live re-run during the demo is fast.
-3. Decide the NEXUS posture: off, or `NEXUS_MODE=stub` with the explicit
-   caveat that stub scores are placeholders (the UI tags them `stub`), or live
-   if access has landed — deploy the endpoint right before, delete right after
-   (~$60+/hr).
+3. Decide the NEXUS posture in the **Build artifacts dialog's off/stub/live
+   selector** (no shell needed; applies immediately, the metrics card appears
+   after the next export): off, or stub with the explicit caveat that stub
+   scores are placeholders (the UI tags them `stub`), or live if access has
+   landed — deploy the endpoint right before, delete right after (~$60+/hr;
+   live also needs the `NEXUS_*` env vars on the backend).
 4. Verify the header badge says **REAL**.
 
 ## Run of show

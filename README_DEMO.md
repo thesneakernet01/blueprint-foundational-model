@@ -142,7 +142,10 @@ back on read; Parquet keeps the original names.
 - **Bigger embedding map:** raise `viz_n` in `export_for_demo.py`.
 - **Branding / colours:** the CSS variables at the top of `index.html`
   (`--signal`, `--amber`, fonts) are the whole theme.
-- **NEXUS Large Tabular Model head (`$NEXUS_MODE`):** `off` (default) hides it
+- **NEXUS Large Tabular Model head:** switch it in the UI — the **Build
+  artifacts** dialog has an off / stub / live selector (persists to
+  `.nexus_settings.json`, applies immediately, wins over `$NEXUS_MODE`; no
+  shell needed on the demo box). `off` (default) hides it
   entirely; `stub` demos the full 4-model path today with deterministic fake
   scores clearly tagged `stub` (no AWS needed); `live` scores through a
   pre-deployed SageMaker endpoint — set `$NEXUS_ENDPOINT_NAME`,

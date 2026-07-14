@@ -154,6 +154,34 @@ export async function startExport(): Promise<{ started: boolean } & ExportStatus
 
 export const getExportStatus = () => getJSON<ExportStatus>('/api/export/status');
 
+// ---- NEXUS head mode (fourth model card) ------------------------------------
+
+export type NexusMode = 'off' | 'stub' | 'live';
+
+export interface NexusSettings {
+  mode: NexusMode;
+  /** Whether the live-mode env config (endpoint + staging bucket) is present. */
+  live_ready: boolean;
+  target: string;
+}
+
+export const getNexusSettings = () => getJSON<NexusSettings>('/api/nexus');
+
+/** Persist the NEXUS head mode. Applies immediately; the metrics card still
+ *  needs a re-export to (dis)appear, while the score bar reacts on next run. */
+export async function postNexusSettings(mode: NexusMode): Promise<NexusSettings> {
+  const res = await fetch(`${API_BASE}/api/nexus`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode }),
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(body?.error ?? `/api/nexus → ${res.status} ${res.statusText}`);
+  }
+  return body;
+}
+
 // ---- data target (splits stored in Impala tables or on VAST S3) -------------
 
 export type DataBackend = 'impala' | 'vast';

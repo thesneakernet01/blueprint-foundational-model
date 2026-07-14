@@ -24,6 +24,7 @@ data/embeddings/
 # .data_settings.json can hold the VAST S3 secret key — never commit it)
 .impala_settings.json
 .data_settings.json
+.nexus_settings.json
 
 # Node / frontend build (frontend/ has its own .gitignore too)
 node_modules/

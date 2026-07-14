@@ -34,13 +34,14 @@ Live config is env-only (AWS credentials via boto3's standard chain):
 
 from __future__ import annotations
 
+import json
 import os
 import threading
 import time
 import zlib
 from typing import Callable, Dict, Optional
 
-from .config import RAW_FEATURE_COLS, log
+from .config import PROJECT_ROOT, RAW_FEATURE_COLS, log
 
 NEXUS_KEY = "nexus"
 NEXUS_LABEL = "Large Tabular Model (NEXUS)"
@@ -56,9 +57,52 @@ class NexusUnavailable(RuntimeError):
 # --------------------------------------------------------------------------- #
 # configuration
 # --------------------------------------------------------------------------- #
+# The mode is settable from the UI (Build-artifacts dialog -> POST /api/nexus)
+# for demo boxes with no shell access. It persists in its own file — NOT in
+# .data_settings.json, which the Data dialog rewrites wholesale on save — and
+# a UI choice wins over $NEXUS_MODE. Both export and scoring read mode() per
+# use, so changes apply without a restart.
+MODES = ("off", "stub", "live")
+_SETTINGS_PATH = PROJECT_ROOT / ".nexus_settings.json"
+_SETTINGS_LOCK = threading.Lock()
+
+
+def _persisted_mode() -> str:
+    try:
+        m = json.loads(_SETTINGS_PATH.read_text()).get("mode", "")
+        return m if m in MODES else ""
+    except FileNotFoundError:
+        return ""
+    except Exception as exc:                                       # noqa: BLE001
+        _warn_ratelimited(f"unreadable {_SETTINGS_PATH.name}: {exc}")
+        return ""
+
+
+def save_mode(m: str) -> None:
+    m = (m or "").strip().lower()
+    if m not in MODES:
+        raise ValueError(f"nexus mode must be one of {', '.join(MODES)}")
+    with _SETTINGS_LOCK:
+        tmp = _SETTINGS_PATH.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps({"mode": m}))
+        tmp.replace(_SETTINGS_PATH)
+
+
+def settings() -> Dict:
+    """What the UI needs to render the mode control."""
+    return {
+        "mode": mode(),
+        "live_ready": bool(_endpoint() and _bucket()),
+        "target": target(),
+    }
+
+
 def mode() -> str:
+    m = _persisted_mode()
+    if m:
+        return m
     m = os.environ.get("NEXUS_MODE", "off").strip().lower() or "off"
-    if m not in ("off", "stub", "live"):
+    if m not in MODES:
         _warn_ratelimited(f"unknown NEXUS_MODE={m!r} — treating as 'off'")
         return "off"
     return m

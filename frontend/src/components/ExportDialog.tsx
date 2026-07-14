@@ -2,9 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Activity, AlertCircle, CheckCircle, Loader2, Play, X } from 'lucide-react';
 import {
   getExportStatus,
+  getNexusSettings,
+  postNexusSettings,
   startExport,
   type ExportState,
   type ExportStatus,
+  type NexusMode,
+  type NexusSettings,
   type ResourceSample,
 } from '../api';
 
@@ -24,10 +28,18 @@ const STATE_META: Record<ExportState, { label: string; cls: string }> = {
   error: { label: 'Failed', cls: 'bg-status-red/20 text-status-red' },
 };
 
+const NEXUS_HINT: Record<NexusMode, string> = {
+  off: 'Fourth model card disabled — the classic three-model story.',
+  stub: 'Deterministic placeholder scores, clearly tagged "stub" — no AWS needed.',
+  live: 'Real scores via the pre-deployed SageMaker endpoint.',
+};
+
 export default function ExportDialog({ open, onClose, onExported }: Props) {
   const [status, setStatus] = useState<ExportStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [reqError, setReqError] = useState<string | null>(null);
+  const [nexus, setNexus] = useState<NexusSettings | null>(null);
+  const [nexusBusy, setNexusBusy] = useState(false);
   const pollRef = useRef<number | null>(null);
   const logRef = useRef<HTMLDivElement | null>(null);
   const notifiedRef = useRef(false);
@@ -67,6 +79,9 @@ export default function ExportDialog({ open, onClose, onExported }: Props) {
     if (!open) return;
     notifiedRef.current = false;
     setReqError(null);
+    getNexusSettings()
+      .then(setNexus)
+      .catch(() => {});
     getExportStatus()
       .then((s) => {
         setStatus(s);
@@ -100,6 +115,21 @@ export default function ExportDialog({ open, onClose, onExported }: Props) {
       setBusy(false);
     }
   }, [startPolling]);
+
+  const setNexusMode = useCallback(
+    async (mode: NexusMode) => {
+      setNexusBusy(true);
+      setReqError(null);
+      try {
+        setNexus(await postNexusSettings(mode));
+      } catch (e) {
+        setReqError(e instanceof Error ? e.message : 'Failed to set NEXUS mode');
+      } finally {
+        setNexusBusy(false);
+      }
+    },
+    [],
+  );
 
   if (!open) return null;
 
@@ -145,6 +175,51 @@ export default function ExportDialog({ open, onClose, onExported }: Props) {
             requires the model checkpoint, the Impala split tables, and a GPU. When it
             finishes, the metrics, examples, and embedding map below refresh automatically.
           </p>
+
+          {/* NEXUS head mode — settable here because demo boxes rarely offer
+              shell access; persists server-side, applies without a restart. */}
+          {nexus && (
+            <div className="bg-surface-2 border border-surface-3 rounded-lg p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-xs font-medium text-gray-300">
+                  NEXUS head{' '}
+                  <span className="text-gray-500 font-normal">· Large Tabular Model</span>
+                </div>
+                <div className="flex rounded-md overflow-hidden border border-surface-4">
+                  {(['off', 'stub', 'live'] as NexusMode[]).map((m) => {
+                    const active = nexus.mode === m;
+                    const liveLocked = m === 'live' && !nexus.live_ready;
+                    return (
+                      <button
+                        key={m}
+                        onClick={() => setNexusMode(m)}
+                        disabled={nexusBusy || active || liveLocked}
+                        title={
+                          liveLocked
+                            ? 'Live needs NEXUS_ENDPOINT_NAME + NEXUS_S3_BUCKET set on the backend'
+                            : undefined
+                        }
+                        className={`px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                          active
+                            ? 'bg-status-purple/20 text-status-purple'
+                            : liveLocked
+                              ? 'text-gray-600 cursor-not-allowed'
+                              : 'text-gray-400 hover:text-gray-200 hover:bg-surface-3'
+                        }`}
+                      >
+                        {m}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <p className="text-[11px] text-gray-500 mt-1.5">
+                {NEXUS_HINT[nexus.mode]}{' '}
+                {nexus.mode !== 'off' &&
+                  'The score bar reacts on the next inference; the metrics card needs a re-run of this export.'}
+              </p>
+            </div>
+          )}
 
           {reqError && (
             <div className="px-4 py-3 bg-status-red-dim/30 border border-status-red/40 rounded-lg text-sm text-status-red">

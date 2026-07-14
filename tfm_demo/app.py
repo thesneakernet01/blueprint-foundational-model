@@ -24,7 +24,7 @@ from . import nexus
 from .config import MODEL_DIR, cors_origins
 from .engine import Engine
 from .jobs import ExportManager, PrepManager
-from .schemas import DataConfig, Txn
+from .schemas import DataConfig, NexusConfig, Txn
 from .settings import get_data_settings, save_data_settings
 
 # Single process-wide engine; warmed up on startup by the lifespan hook.
@@ -123,6 +123,21 @@ def create_app() -> FastAPI:
         except ValueError as exc:
             return JSONResponse({"error": str(exc)}, status_code=422)
         return JSONResponse({**_masked_settings(), "check": storage.check()})
+
+    # ---- NEXUS head mode (settable from the Build-artifacts dialog) --------
+    @app.get("/api/nexus")
+    def nexus_settings() -> JSONResponse:
+        return JSONResponse(nexus.settings())
+
+    @app.post("/api/nexus")
+    def nexus_configure(cfg: NexusConfig) -> JSONResponse:
+        """Persist the NEXUS head mode. Takes effect immediately — mode is
+        read per export run and per scoring request, no restart needed."""
+        try:
+            nexus.save_mode(cfg.mode)
+        except ValueError as exc:
+            return JSONResponse({"error": str(exc)}, status_code=422)
+        return JSONResponse(nexus.settings())
 
     @app.post("/api/data/prepare")
     def start_prepare() -> JSONResponse:

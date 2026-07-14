@@ -3,6 +3,7 @@ import Header from './components/Header';
 import MetricsStrip from './components/MetricsStrip';
 import TransactionComposer, {
   DEFAULT_FORM,
+  exampleToForm,
   formToPayload,
   type FormState,
 } from './components/TransactionComposer';
@@ -34,6 +35,9 @@ export default function App() {
   const [umap, setUmap] = useState<UmapPoint[]>([]);
 
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
+  // The example the form currently holds untouched, if any — its
+  // expected_position drives the diagnostic ring on the embedding map.
+  const [loadedExample, setLoadedExample] = useState<Example | null>(null);
   const [result, setResult] = useState<ScoreResp | null>(null);
   const [scoring, setScoring] = useState(false);
   const [scoreError, setScoreError] = useState<string | null>(null);
@@ -91,8 +95,15 @@ export default function App() {
         <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr_400px] gap-6 items-start">
           <TransactionComposer
             form={form}
-            setForm={setForm}
+            setForm={(f) => {
+              setForm(f);
+              setLoadedExample(null); // manual edit — no longer "the" example
+            }}
             examples={examples}
+            onLoadExample={(ex) => {
+              setForm(exampleToForm(ex.txn));
+              setLoadedExample(ex);
+            }}
             onRun={runInference}
             scoring={scoring}
           />
@@ -102,7 +113,7 @@ export default function App() {
               <div className="bg-surface-2 rounded-lg border border-surface-3 p-4 h-[420px] animate-pulse" />
             }
           >
-            <EmbeddingMap umap={umap} result={result} />
+            <EmbeddingMap umap={umap} result={result} expected={loadedExample?.expected_position ?? null} />
           </Suspense>
         </div>
       </main>

@@ -78,6 +78,26 @@ The map shows the foundation model organizing transactions into fraud/legit
 geometry without ever being told what fraud is. Then do the left-to-right
 sweep (below).
 
+**How to read (and narrate) the embedding map:**
+
+- **Fraud examples land inside the tight red cluster** — fraud is
+  *distinctive*, so UMAP places it confidently. This is your money shot.
+- **Legitimate examples can sit at the rim of the blue cloud.** That's
+  expected, not a bug: a generic transaction resembles *everything*, and UMAP
+  settles diffuse points at low-density edges. The narration that lands:
+  *"what matters isn't where in the normal mass it sits — it's that it's
+  nowhere near the fraud cluster."*
+- The frame is **pinned to the background extents** — a single outlying live
+  point can't rescale the map; it pins to the frame edge and a caption below
+  the map says so.
+- **Dashed ring = "Expected (batch)"**: when you score an untouched example,
+  a hollow ring marks where the export's batch pipeline projected that exact
+  row. Live dot on/near its ring = the live scoring path agrees with
+  training. A consistently large gap is a diagnostic signal (live-vs-batch
+  embedding drift), not something to demo — mention it to engineering, and
+  hand-edit any field to hide the ring. Rings appear after the first export
+  run with this build.
+
 ## The two-worlds framing ("everything XGBoost vs everything foundational")
 
 **Get the subtlety right: three of the four heads ARE XGBoost.** What differs

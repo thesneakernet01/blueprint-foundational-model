@@ -6,6 +6,9 @@ import type { ScoreResp, UmapPoint } from '../api';
 interface Props {
   umap: UmapPoint[];
   result: ScoreResp | null;
+  /** Batch-path map position of the loaded example (diagnostic ring): where
+   *  the export projected this exact row. Null when the form was hand-edited. */
+  expected?: { x: number; y: number } | null;
 }
 
 // Recharts gets sluggish past a couple thousand markers; keep all (rare) fraud
@@ -25,7 +28,17 @@ function LiveDot(props: { cx?: number; cy?: number }) {
   );
 }
 
-export default function EmbeddingMap({ umap, result }: Props) {
+// Hollow dashed ring: where the batch pipeline put this example at export
+// time. Live dot far from its ring = live-vs-batch embedding drift.
+function ExpectedRing(props: { cx?: number; cy?: number }) {
+  const { cx, cy } = props;
+  if (cx == null || cy == null) return null;
+  return (
+    <circle cx={cx} cy={cy} r={8} fill="none" stroke="#e5e7eb" strokeWidth={1.5} strokeDasharray="3 2.5" opacity={0.8} />
+  );
+}
+
+export default function EmbeddingMap({ umap, result, expected }: Props) {
   const { normal, fraud, dropped } = useMemo(() => {
     const fraudPts = umap.filter((p) => p.fraud);
     const normalPts = umap.filter((p) => !p.fraud);
@@ -35,7 +48,39 @@ export default function EmbeddingMap({ umap, result }: Props) {
     return { normal: sampled, fraud: fraudPts, dropped: normalPts.length - sampled.length };
   }, [umap]);
 
-  const live = result?.position ? [result.position] : [];
+  // Axes pinned to the BACKGROUND extents (+padding): one outlying live point
+  // must not rescale the whole map — it clamps to the frame edge instead and
+  // gets called out below.
+  const domain = useMemo(() => {
+    if (!umap.length) return null;
+    let xmin = Infinity, xmax = -Infinity, ymin = Infinity, ymax = -Infinity;
+    for (const p of umap) {
+      if (p.x < xmin) xmin = p.x;
+      if (p.x > xmax) xmax = p.x;
+      if (p.y < ymin) ymin = p.y;
+      if (p.y > ymax) ymax = p.y;
+    }
+    const padX = (xmax - xmin || 1) * 0.08;
+    const padY = (ymax - ymin || 1) * 0.08;
+    return {
+      x: [xmin - padX, xmax + padX] as [number, number],
+      y: [ymin - padY, ymax + padY] as [number, number],
+    };
+  }, [umap]);
+
+  const clamp = (p: { x: number; y: number }) =>
+    domain
+      ? {
+          x: Math.min(Math.max(p.x, domain.x[0]), domain.x[1]),
+          y: Math.min(Math.max(p.y, domain.y[0]), domain.y[1]),
+        }
+      : p;
+
+  const rawLive = result?.position ?? null;
+  const live = rawLive ? [clamp(rawLive)] : [];
+  const liveClamped =
+    rawLive != null && (live[0].x !== rawLive.x || live[0].y !== rawLive.y);
+  const expectedPts = expected ? [clamp(expected)] : [];
   const hasData = umap.length > 0 || live.length > 0;
 
   return (
@@ -57,11 +102,14 @@ export default function EmbeddingMap({ umap, result }: Props) {
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <ScatterChart margin={{ top: 12, right: 12, bottom: 12, left: 12 }}>
-              <XAxis type="number" dataKey="x" hide domain={['dataMin', 'dataMax']} />
-              <YAxis type="number" dataKey="y" hide domain={['dataMin', 'dataMax']} />
+              <XAxis type="number" dataKey="x" hide domain={domain?.x ?? ['dataMin', 'dataMax']} allowDataOverflow />
+              <YAxis type="number" dataKey="y" hide domain={domain?.y ?? ['dataMin', 'dataMax']} allowDataOverflow />
               <ZAxis range={[16, 16]} />
               <Scatter data={normal} fill="#3a6ea5" fillOpacity={0.45} isAnimationActive={false} />
               <Scatter data={fraud} fill="#ef4444" fillOpacity={0.75} isAnimationActive={false} />
+              {expectedPts.length > 0 && (
+                <Scatter data={expectedPts} isAnimationActive={false} shape={<ExpectedRing />} />
+              )}
               {live.length > 0 && (
                 <Scatter data={live} isAnimationActive={false} shape={<LiveDot />} />
               )}
@@ -84,11 +132,21 @@ export default function EmbeddingMap({ umap, result }: Props) {
           />{' '}
           This transaction
         </span>
+        {expectedPts.length > 0 && (
+          <span className="flex items-center gap-1.5">
+            <i
+              className="w-2.5 h-2.5 rounded-full inline-block border border-dashed"
+              style={{ borderColor: '#e5e7eb' }}
+            />{' '}
+            Expected (batch)
+          </span>
+        )}
       </div>
 
       <p className="text-[10px] text-gray-600 mt-3 leading-relaxed">
         512-d embeddings projected to 2-D. The decoder learns the geometry from raw sequences — fraud
         clusters emerge with no labels.
+        {liveClamped && ' Live point landed beyond the background extent — pinned to the frame edge.'}
         {dropped > 0 && ` ${dropped.toLocaleString()} background points downsampled for rendering.`}
       </p>
     </div>

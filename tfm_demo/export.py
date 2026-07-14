@@ -454,6 +454,7 @@ def run_export(progress: Progress = None) -> Dict:
 
     # ---- real example transactions to click ------------------------------
     examples = []
+    example_rows = []            # test-split row index of each example
     # The test split's selected rows (host pandas) for per-row .iloc access.
     test_raw_reset = parts["test"]["rows"]
     for want_fraud, label in [(1, "Real fraud (test set)"),
@@ -461,13 +462,29 @@ def run_export(progress: Progress = None) -> Dict:
                               (1, "Real fraud #2 (test set)")]:
         pool = np.where(y_test == want_fraud)[0]
         if len(pool):
-            r = test_raw_reset.iloc[pool[len(pool) // 2]]
+            row = int(pool[len(pool) // 2])
+            example_rows.append(row)
+            r = test_raw_reset.iloc[row]
             examples.append({"label": label, "is_fraud": bool(want_fraud), "txn": {
                 "Amount": f"${float(r['Amount']):.2f}", "Merchant Name": str(r["Merchant Name"]),
                 "Merchant City": str(r["Merchant City"]), "Merchant State": str(r["Merchant State"]),
                 "Use Chip": str(r["Use Chip"]), "MCC": int(r["MCC"]), "Zip": str(r["Zip"]),
                 "Time": str(r["Time"]), "Year": int(r["Year"]), "Month": int(r["Month"]),
                 "Day": int(r["Day"]), "Card": int(r["Card"]), "User": int(r["User"])}})
+
+    # Diagnostic: stamp each example with where the BATCH-path embedding of
+    # that exact row projects on the map. The UI overlays it as a hollow ring
+    # so a live score of an untouched example shows the live-vs-batch drift
+    # directly (a big gap = the single-row scoring pipeline embeds the row
+    # differently than the export did — worth chasing in engine._embed_one).
+    if umap_bg and example_rows:
+        try:
+            exp = cp.asnumpy(umap.transform(cp.asarray(X_test_e[example_rows])))
+            for ex, c in zip(examples, exp):
+                ex["expected_position"] = {"x": float(c[0]), "y": float(c[1])}
+            emit("Examples stamped with their batch-path map positions")
+        except Exception as exc:                                   # noqa: BLE001
+            emit(f"(skipping example map positions: {exc})")
 
     # ---- write everything -------------------------------------------------
     emit(f"Writing artifacts to {OUT} ...")

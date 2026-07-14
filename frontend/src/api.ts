@@ -64,6 +64,9 @@ export interface Example {
   label: string;
   is_fraud: boolean | null;
   txn: Record<string, string | number>;
+  /** Where this row's batch-path embedding projects on the UMAP map — the UI
+   *  overlays it as a ring so live-vs-batch drift is visible (diagnostic). */
+  expected_position?: { x: number; y: number } | null;
 }
 
 export interface UmapPoint {

@@ -69,11 +69,14 @@ interface Props {
   form: FormState;
   setForm: (f: FormState) => void;
   examples: Example[];
+  /** Example-card click — lets the app track which example the form holds
+   *  (cleared again on any manual field edit via setForm). */
+  onLoadExample: (ex: Example) => void;
   onRun: () => void;
   scoring: boolean;
 }
 
-export default function TransactionComposer({ form, setForm, examples, onRun, scoring }: Props) {
+export default function TransactionComposer({ form, setForm, examples, onLoadExample, onRun, scoring }: Props) {
   const set = (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm({ ...form, [k]: e.target.value });
 
@@ -89,7 +92,7 @@ export default function TransactionComposer({ form, setForm, examples, onRun, sc
           {examples.map((ex, i) => (
             <button
               key={i}
-              onClick={() => setForm(exampleToForm(ex.txn))}
+              onClick={() => onLoadExample(ex)}
               className="text-left bg-surface-3 border border-surface-4 rounded-lg px-3 py-2 transition-colors hover:border-accent/50 hover:bg-surface-3"
             >
               <div className="text-xs text-gray-200">{ex.label}</div>

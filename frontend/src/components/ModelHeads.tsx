@@ -8,11 +8,26 @@ interface Props {
   error: string | null;
 }
 
-const HEADS: { key: 'raw' | 'embed' | 'combined' | 'nexus'; label: string; fill: string; text: string }[] = [
-  { key: 'raw', label: 'Raw features', fill: 'bg-gray-500', text: 'text-gray-200' },
-  { key: 'embed', label: 'Embeddings', fill: 'bg-accent', text: 'text-accent' },
-  { key: 'combined', label: 'Combined', fill: 'bg-status-amber', text: 'text-status-amber' },
-  { key: 'nexus', label: 'Large Tabular Model', fill: 'bg-status-purple', text: 'text-status-purple' },
+// Heads grouped by paradigm: classic ML (hand-crafted features -> XGBoost),
+// hybrid (foundation-model embeddings -> the same XGBoost), fully foundational
+// (the model IS the classifier). Groups with no scores in the response hide.
+const PARADIGMS: { id: 'classic' | 'hybrid' | 'foundation'; label: string; cls: string }[] = [
+  { id: 'classic', label: 'classic ml', cls: 'text-gray-500' },
+  { id: 'hybrid', label: 'foundation-fed xgboost', cls: 'text-accent/70' },
+  { id: 'foundation', label: 'foundation model', cls: 'text-status-purple/70' },
+];
+
+const HEADS: {
+  key: 'raw' | 'embed' | 'combined' | 'nexus';
+  paradigm: 'classic' | 'hybrid' | 'foundation';
+  label: string;
+  fill: string;
+  text: string;
+}[] = [
+  { key: 'raw', paradigm: 'classic', label: 'Raw features', fill: 'bg-gray-500', text: 'text-gray-200' },
+  { key: 'embed', paradigm: 'hybrid', label: 'Embeddings', fill: 'bg-accent', text: 'text-accent' },
+  { key: 'combined', paradigm: 'hybrid', label: 'Combined', fill: 'bg-status-amber', text: 'text-status-amber' },
+  { key: 'nexus', paradigm: 'foundation', label: 'Large Tabular Model', fill: 'bg-status-purple', text: 'text-status-purple' },
 ];
 
 const THRESHOLD = 0.5;
@@ -83,24 +98,36 @@ export default function ModelHeads({ result, summary, scoring, error }: Props) {
       {result && (
         <>
           <div className="space-y-4">
-            {HEADS.filter(({ key }) => key in result.scores).map(({ key, label, fill, text }) => {
-              const p = result.scores[key];
-              const pct = typeof p === 'number' ? (p * 100).toFixed(1) : null;
+            {PARADIGMS.map(({ id, label: groupLabel, cls }) => {
+              const heads = HEADS.filter((h) => h.paradigm === id && h.key in result.scores);
+              if (!heads.length) return null;
               return (
-                <div key={key}>
-                  <div className="flex items-baseline justify-between mb-1.5">
-                    <span className="text-xs text-gray-300">{label}</span>
-                    <span className={`font-mono text-base font-medium ${pct == null ? 'text-gray-600' : text}`}>
-                      {pct == null ? '—' : `${pct}%`}
-                    </span>
+                <div key={id} className="space-y-4">
+                  <div className="flex items-center gap-2 -mb-1">
+                    <span className={`text-[9px] uppercase tracking-widest ${cls}`}>{groupLabel}</span>
+                    <div className="flex-1 h-px bg-surface-3" />
                   </div>
-                  <div className="h-2 bg-surface-3 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${fill} transition-[width] duration-700 ease-out`}
-                      style={{ width: `${pct ?? 0}%` }}
-                    />
-                  </div>
-                  <div className="text-[10px] font-mono text-gray-600 mt-1">{meta(key, summary, result)}</div>
+                  {heads.map(({ key, label, fill, text }) => {
+                    const p = result.scores[key];
+                    const pct = typeof p === 'number' ? (p * 100).toFixed(1) : null;
+                    return (
+                      <div key={key}>
+                        <div className="flex items-baseline justify-between mb-1.5">
+                          <span className="text-xs text-gray-300">{label}</span>
+                          <span className={`font-mono text-base font-medium ${pct == null ? 'text-gray-600' : text}`}>
+                            {pct == null ? '—' : `${pct}%`}
+                          </span>
+                        </div>
+                        <div className="h-2 bg-surface-3 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${fill} transition-[width] duration-700 ease-out`}
+                            style={{ width: `${pct ?? 0}%` }}
+                          />
+                        </div>
+                        <div className="text-[10px] font-mono text-gray-600 mt-1">{meta(key, summary, result)}</div>
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })}

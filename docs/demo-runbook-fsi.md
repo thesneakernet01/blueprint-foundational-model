@@ -33,6 +33,26 @@ lower loss. Plant the one-liner now:
 > with what a foundation model learned from raw transaction sequences, and
 > that alone is worth the lift you see."
 
+**Sidebar — what "AP lift" means (know this cold, someone will ask):**
+
+- **AP = Average Precision**, the area under the precision–recall curve. As
+  the alert threshold sweeps from strict to loose, precision is *"of what we
+  flagged, how much was really fraud"* and recall is *"of all the fraud, how
+  much did we catch"* — AP averages precision across every level of recall,
+  one number for the whole trade-off curve.
+- **Why AP and not just AUC:** fraud is ~1-in-1,000. ROC-AUC flatters
+  imbalanced problems because it gets credit for correctly ignoring the ocean
+  of legitimate transactions (hence everything scores 0.97+). AP only rewards
+  ranking the rare fraud above the noise — that's why the AP numbers are
+  lower and why the *differences between models* are much bigger in AP. It's
+  the honest metric for this problem.
+- **AP lift** = percentage improvement in AP over the raw-features XGBoost
+  baseline.
+- **The business translation (say this one):** *"higher AP means more real
+  fraud caught per alert raised — the same alert budget catches meaningfully
+  more fraud, or the same catch rate generates far fewer false positives
+  annoying customers and clogging the analyst queue."*
+
 ### 2. Data dialog — where the data lives (2 minutes)
 
 Pick the storage backend (S3 object store or Impala/CDW), *Save & test*,

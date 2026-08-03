@@ -22,7 +22,7 @@ header boto3 never sends — one of the few remaining request differences).
 
 Run from a CML session (downloads from round 1 are reused):
 
-    python scripts/vast_s3a_debug.py
+    python infra/vast_s3a_debug.py
 """
 
 from __future__ import annotations

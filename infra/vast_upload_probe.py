@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Pinpoint which upload wire format the VAST endpoint/gateway rejects.
 
-scripts/vast_probe.py proved the metadata calls work, but real uploads die
+infra/vast_probe.py proved the metadata calls work, but real uploads die
 with "Connection was closed before we received a valid response" / 502 while
 its ZERO-BYTE PutObject passed. The app's uploads differ from that probe on
 three axes, each a known S3-compatibility landmine:
@@ -17,7 +17,7 @@ This script PUTs a matrix of (size × body kind × checksum mode) objects and
 prints PASS/FAIL per cell, escalating sizes until a variant first fails —
 so one run names the exact offending combination. Run from a CML session:
 
-    python scripts/vast_upload_probe.py
+    python infra/vast_upload_probe.py
 
 Credentials/endpoint come from env if set (VAST_ACCESS_KEY / VAST_SECRET_KEY /
 VAST_ENDPOINT / VAST_BUCKET / VAST_PATH), otherwise it prompts. Probe objects

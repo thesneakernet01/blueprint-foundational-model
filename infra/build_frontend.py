@@ -5,13 +5,13 @@ Node + npm are installed into a **user-local** prefix (default
 `~/.local/node`), never a global/system location, so no root or `sudo` is
 needed and nothing outside the user's home is touched. The downloaded Node's
 `bin/` is put on PATH only for the child npm processes, then we run
-`npm ci && npm run build` in `frontend/`, producing `frontend/dist`.
+`npm ci && npm run build` in `app/frontend/`, producing `app/frontend/dist`.
 
-`ensure_node()` / `npm_env()` are reused by `scripts/serve_app.py` to run the
+`ensure_node()` / `npm_env()` are reused by `app/serve_app.py` to run the
 Vite preview server from the same user-local toolchain.
 
 Run:
-    python scripts/build_frontend.py
+    python infra/build_frontend.py
 Override the toolchain location / version with $NODE_PREFIX / $NODE_VERSION.
 """
 
@@ -79,7 +79,7 @@ def npm_env(node_bin: Path) -> dict[str, str]:
 def build() -> None:
     """Install deps and produce frontend/dist from the user-local toolchain."""
     env = npm_env(ensure_node())
-    frontend = project_root() / "frontend"
+    frontend = project_root() / "app" / "frontend"
     install = ["npm", "ci"] if (frontend / "package-lock.json").exists() else ["npm", "install"]
     subprocess.run(install, cwd=frontend, env=env, check=True)
     subprocess.run(["npm", "run", "build"], cwd=frontend, env=env, check=True)

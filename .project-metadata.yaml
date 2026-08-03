@@ -1,7 +1,7 @@
 # Cloudera AI / CML Applied ML Prototype (AMP) project metadata.
 # Spec: https://docs.cloudera.com/machine-learning/1.5.4/applied-ml-prototypes/topics/ml-amp-project-spec.html
 #
-# Deploys ONE application (scripts/serve_app.py) that runs both halves of the
+# Deploys ONE application (app/serve_app.py) that runs both halves of the
 # demo in a single GPU container — CML exposes one public port per application
 # and separate apps can't talk over localhost, so they must share a container:
 #   * FastAPI backend (NVIDIA TFM stack) — private on 127.0.0.1:$BACKEND_PORT
@@ -88,7 +88,7 @@ tasks:
   - type: create_job
     name: Install dependencies
     entity_label: install_deps
-    script: scripts/install_deps.py
+    script: infra/install_deps.py
     arguments: None
     short_summary: Install the web layer + the NVIDIA/GPU Python stack (CUDA assumed present).
     kernel: Python 3.12
@@ -108,7 +108,7 @@ tasks:
   - type: create_job
     name: Build frontend SPA
     entity_label: build_frontend
-    script: scripts/build_frontend.py
+    script: infra/build_frontend.py
     arguments: None
     short_summary: Install Node user-locally and build the React SPA bundle.
     kernel: Python 3.12
@@ -129,7 +129,7 @@ tasks:
   - type: create_job
     name: Fetch model checkpoint
     entity_label: fetch_model
-    script: scripts/fetch_model.py
+    script: pipelines/fetch_model.py
     arguments: None
     short_summary: Download the model checkpoint into ./models and the blueprint src/ package.
     kernel: Python 3.12
@@ -154,7 +154,7 @@ tasks:
   - type: create_job
     name: Prepare TabFormer data
     entity_label: prepare_data
-    script: scripts/prepare_data.py
+    script: pipelines/prepare_data.py
     arguments: None
     short_summary: Download TabFormer and load the temporal splits into Impala.
     kernel: Python 3.12
@@ -174,7 +174,7 @@ tasks:
     name: TFM Fraud Demo
     # No subdomain specified: CML assigns a unique one dynamically, so redeploys
     # never collide on applications_subdomain_idx.
-    script: scripts/serve_app.py
+    script: app/serve_app.py
     kernel: Python 3.12
     cpu: 2
     memory: 16

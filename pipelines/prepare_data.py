@@ -25,7 +25,7 @@ Train is capped ($PREP_TRAIN_CAP, default 1M). Idempotent — skips when the
 tables are already populated — unless $PREP_FORCE=1 (the UI's "Load data"
 button forces, so a click always re-ingests). No GPU required.
 
-Run:  python scripts/prepare_data.py
+Run:  python pipelines/prepare_data.py
 """
 
 from __future__ import annotations

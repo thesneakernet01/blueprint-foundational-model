@@ -7,7 +7,7 @@ Both run in a daemon thread and stream a line log the UI polls:
     server restart.
   * PrepManager — downloads TabFormer and loads the temporal splits into the
     UI-configured storage target (Impala database or VAST S3), by running
-    scripts/prepare_data.py in a subprocess (keeps the multi-GB pandas chunks
+    pipelines/prepare_data.py in a subprocess (keeps the multi-GB pandas chunks
     out of the server process and makes a native crash non-fatal to the API).
 """
 
@@ -140,7 +140,7 @@ class PrepManager(JobManager):
             raise RuntimeError(
                 "Configure the storage target first (Data dialog)."
             )
-        script = PROJECT_ROOT / "scripts" / "prepare_data.py"
+        script = PROJECT_ROOT / "pipelines" / "prepare_data.py"
         # PREP_FORCE=1: a UI click means "load/refresh the data", so re-ingest
         # even when the tables already exist.
         env = {**os.environ, "PREP_FORCE": "1"}

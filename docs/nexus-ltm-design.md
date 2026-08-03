@@ -84,11 +84,11 @@ this app ever creates or deletes an endpoint. Operating procedure:
 
 ## Day-one-of-access checklist
 
-Run `scripts/nexus_probe.py` first — each step isolates one unknown below.
+Run `infra/nexus_probe.py` first — each step isolates one unknown below.
 
 1. **Exact pip package name/version** → fill `requirements-nexus.txt`, fix the
    import inside `nexus._sdk()` (one place); decide whether
-   `scripts/install_deps.py` should install it.
+   `infra/install_deps.py` should install it.
 2. **Single-row predict latency** (probe step 6, p50/p95) → set the default
    `NEXUS_SCORE_TIMEOUT_S` honestly. If p95 > ~3 s, keep null-on-timeout and
    consider pre-scoring `examples.json` at export time as a follow-up.

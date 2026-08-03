@@ -111,7 +111,7 @@ The flow is the same either way:
    `.data_settings.json` (mode 0600; it can hold the VAST secret key).
 2. Click **Load TabFormer → …** — downloads the ~2.4 GB TabFormer dump,
    rebuilds NB01's temporal split in chunked pandas, and writes the three
-   splits (`scripts/prepare_data.py`, also runnable as the CML job).
+   splits (`pipelines/prepare_data.py`, also runnable as the CML job).
 3. **Build artifacts** (training) then reads the splits back into cuDF on the
    GPU.
 
@@ -154,7 +154,7 @@ back on read; Parquet keeps the original names.
   **Cost warning:** the NEXUS endpoint is a single-tenant `ml.p5en.48xlarge`
   (~$60+/hr) — deploy it right before the demo window and delete it right
   after; this app never creates or deletes endpoints. Live transport ships
-  disabled until Fundamental access lands — run `scripts/nexus_probe.py` and
+  disabled until Fundamental access lands — run `infra/nexus_probe.py` and
   follow the day-one checklist in `docs/nexus-ltm-design.md`.
 
 Built on the NVIDIA AI Blueprint *Transaction Foundation Model* (Apache-2.0).

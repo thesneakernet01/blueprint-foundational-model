@@ -18,7 +18,7 @@ when it is already importable (in-project or the nested-in-blueprint layout).
 Honors $MODEL_DIR (via config). Override the source with $TFM_MODEL_REF (branch
 /tag/sha).
 
-Run:  python scripts/fetch_model.py
+Run:  python pipelines/fetch_model.py
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-# Make `tfm_demo` importable when run as `python scripts/fetch_model.py`.
+# Make `tfm_demo` importable when run as `python pipelines/fetch_model.py`.
 try:
     _ROOT = Path(__file__).resolve().parent.parent
 except NameError:

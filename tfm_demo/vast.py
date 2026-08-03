@@ -274,7 +274,7 @@ def read_split_cudf(split: str, columns: Sequence[str]):
         raise RuntimeError(
             f"VAST split object s3://{bucket}/{key} is missing or unreadable "
             f"({_first_line(exc)}) — run the data load from the UI's Data "
-            "dialog (or scripts/prepare_data.py) first."
+            "dialog (or pipelines/prepare_data.py) first."
         ) from exc
     buf.seek(0)
 

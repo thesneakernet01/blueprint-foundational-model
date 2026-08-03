@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Impala data layer — the temporal splits live in Impala tables, not parquet.
 
-Write side (scripts/prepare_data.py): each split becomes a Parquet-backed
+Write side (pipelines/prepare_data.py): each split becomes a Parquet-backed
 Impala table (`<db>.train` / `val_eval` / `test_eval`) loaded with batched
 multi-row INSERTs. Read side (tfm_demo/export.py): splits are SELECTed back in
 chunks, built into pandas on the host, and concatenated into one cuDF frame on
@@ -350,7 +350,7 @@ def read_split_cudf(split: str, columns: Sequence[str]):
     if not parts:
         raise RuntimeError(
             f"Impala table {database()}.{table} is empty — run the data load "
-            "from the UI's Data dialog (or scripts/prepare_data.py) first."
+            "from the UI's Data dialog (or pipelines/prepare_data.py) first."
         )
     return parts[0] if len(parts) == 1 else cudf.concat(parts, ignore_index=True)
 

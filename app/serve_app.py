@@ -30,9 +30,9 @@ from pathlib import Path
 
 # Import the user-local Node helpers from the sibling build script.
 try:
-    _SCRIPTS = Path(__file__).resolve().parent
+    _SCRIPTS = Path(__file__).resolve().parent.parent / "infra"
 except NameError:
-    _SCRIPTS = Path.cwd() / "scripts"
+    _SCRIPTS = Path.cwd() / "infra"
 sys.path.insert(0, str(_SCRIPTS))
 from build_frontend import build, ensure_node, npm_env, project_root  # noqa: E402
 
@@ -52,7 +52,7 @@ def main() -> None:
 
     # The SPA bundle must exist for `vite preview`; build it if a prior Job
     # didn't (e.g. running this entrypoint standalone).
-    if not (root / "frontend" / "dist" / "index.html").exists():
+    if not (root / "app" / "frontend" / "dist" / "index.html").exists():
         print("serve_app: frontend/dist missing — building it now")
         build()
 
@@ -71,7 +71,7 @@ def main() -> None:
     frontend = subprocess.Popen(
         ["npm", "run", "preview", "--",
          "--host", "127.0.0.1", "--port", str(public_port), "--strictPort"],
-        cwd=str(root / "frontend"),
+        cwd=str(root / "app" / "frontend"),
         env=env,
     )
     print(f"serve_app: backend pid={backend.pid} :{backend_port}  "

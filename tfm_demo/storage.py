@@ -6,7 +6,7 @@ The Data dialog picks WHERE the temporal splits live:
   * "vast"   — Parquet objects written straight to VAST S3 with boto3
                (tfm_demo/vast.py), bypassing the warehouse's broken s3a path
 
-Writers (scripts/prepare_data.py) and readers (tfm_demo/export.py) go through
+Writers (pipelines/prepare_data.py) and readers (tfm_demo/export.py) go through
 this module only, so both backends stay interchangeable. Backend modules are
 imported lazily — the impala path must not require boto3 and vice versa.
 """

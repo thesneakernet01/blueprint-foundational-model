@@ -283,7 +283,7 @@ def score_one(txn_raw_df, meta: Optional[Dict] = None,
 
 
 def check() -> Dict:
-    """Cheap connectivity probe for scripts/nexus_probe.py and debugging.
+    """Cheap connectivity probe for infra/nexus_probe.py and debugging.
     Never raises."""
     out: Dict = {"ok": False, "mode": mode(), "target": target(),
                  "error": None, "latency_ms": None}

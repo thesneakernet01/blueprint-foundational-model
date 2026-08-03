@@ -17,7 +17,7 @@ This script replays each call individually with boto3 (plus ListObjects V1 as
 a comparison for #3) and reports PASS/FAIL per call, so the offending API is
 identified instead of guessed. Run it from a CML session:
 
-    python scripts/vast_probe.py
+    python infra/vast_probe.py
 
 Credentials/endpoint come from env if set (VAST_ACCESS_KEY / VAST_SECRET_KEY /
 VAST_ENDPOINT / VAST_BUCKET / VAST_PATH), otherwise it prompts.

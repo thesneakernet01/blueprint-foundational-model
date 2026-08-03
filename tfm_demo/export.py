@@ -20,7 +20,7 @@ tfm_demo/jobs.py); the root `export_for_demo.py` shim runs it from the CLI.
 Prerequisites at runtime: the decoder-foundation-model checkpoint (config.MODEL_DIR
 / $MODEL_DIR), the blueprint's src/, and the temporal splits loaded into the
 UI-configured storage target — an Impala database or VAST S3 objects
-(scripts/prepare_data.py writes them; see tfm_demo/storage.py).
+(pipelines/prepare_data.py writes them; see tfm_demo/storage.py).
 """
 
 from __future__ import annotations
@@ -163,7 +163,7 @@ def _build_inference(emit):
     if not MODEL_DIR.exists():
         raise FileNotFoundError(
             f"decoder-foundation-model checkpoint missing at {MODEL_DIR}. "
-            "In-app embedding generation needs it — run `python scripts/fetch_model.py` "
+            "In-app embedding generation needs it — run `python pipelines/fetch_model.py` "
             "(or set $MODEL_DIR to an existing checkpoint)."
         )
     from src.tokenizer import FinancialTokenizerPipeline, FinancialTabularTokenizer
@@ -308,7 +308,7 @@ def run_export(progress: Progress = None) -> Dict:
         raise RuntimeError(
             f"Training data not ready: {detail}. Open the Data dialog in the "
             "UI to configure the storage target and run the data load (or run "
-            "scripts/prepare_data.py)."
+            "pipelines/prepare_data.py)."
         )
     emit(f"Splits ready: {detail}")
 

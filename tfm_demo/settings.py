@@ -7,7 +7,7 @@ boto3 — and the settings must be visible to BOTH the API server (training/
 export reads) and the data-prep script (writes) — on CML those run as separate
 processes sharing the project filesystem, so a small JSON file is the simplest
 shared store. Env vars seed the defaults for a fresh project ($IMPALA_* /
-$VAST_*, same names as scripts/vast_probe.py); a UI save overrides them from
+$VAST_*, same names as infra/vast_probe.py); a UI save overrides them from
 then on.
 
 The file may hold the VAST secret key, so it is written 0600.

@@ -36,7 +36,7 @@ export default function BudgetChart({ runs, schedule }: Props) {
       <div className="panel p-4">
         <h3 className="slide-title mb-2">Training budget schedule</h3>
         <p className="text-[11px] text-gray-400 mb-3">
-          Each run earns a bigger budget — rows embedded per split and boosting rounds:
+          The budget is what a run may spend — transactions embedded and boosting rounds. Each run is granted more than the last:
         </p>
         <div className="space-y-1.5">
           {schedule.map((b, i) => (
@@ -62,6 +62,23 @@ export default function BudgetChart({ runs, schedule }: Props) {
     <div className="panel p-4 space-y-3">
       <div>
         <h3 className="slide-title mb-1">Training budget per run</h3>
+        <p className="text-[11px] text-gray-500 leading-snug mb-2">
+          The budget is what a run is allowed to spend: how many transactions the
+          foundation model reads (bars) and how long the classifier refines itself
+          (line). Each run is granted more than the last — that growing spend is
+          what pushes the quality chart up, and every run records its cost next to
+          its result.
+        </p>
+        <div className="flex items-center gap-4 mb-1">
+          <span className="flex items-center gap-1.5 text-[10px] text-gray-500">
+            <span className="w-2.5 h-2.5 rounded-sm" style={{ background: '#5555F9', opacity: 0.55 }} />
+            transactions embedded per split
+          </span>
+          <span className="flex items-center gap-1.5 text-[10px] text-gray-500">
+            <span className="w-2.5 h-0.5 rounded" style={{ background: '#FF550C' }} />
+            boosting rounds (combined head)
+          </span>
+        </div>
         <ResponsiveContainer width="100%" height={130}>
           <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
             <CartesianGrid stroke={CHART.grid} strokeDasharray="3 3" vertical={false} />
@@ -105,7 +122,7 @@ export default function BudgetChart({ runs, schedule }: Props) {
       </div>
 
       <div>
-        <h3 className="text-[11px] text-gray-500 mb-1">Export duration</h3>
+        <h3 className="text-[11px] text-gray-500 mb-1">Export duration — what each budget cost in wall-clock time</h3>
         <ResponsiveContainer width="100%" height={70}>
           <ComposedChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
             <XAxis

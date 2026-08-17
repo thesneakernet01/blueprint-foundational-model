@@ -31,23 +31,14 @@ samp {
   font-family: 'JetBrains Mono', monospace;
 }
 
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #f5f5fa; /* surface-0 */
-}
-::-webkit-scrollbar-thumb {
-  background: #c9c9dd;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #a9a9c6;
-}
+/* No custom ::-webkit-scrollbar styling: defining it forces a classic
+   scrollbar that reserves a right-edge gutter, which kept the fixed orange
+   brand bar from reaching the browser edge. Overlay scrollbars float over
+   content instead. Firefox keeps a thin, theme-matched scrollbar (this rule
+   does not force a gutter there). */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #c9c9dd #f5f5fa;
+  scrollbar-color: #c9c9dd transparent;
 }
 
 @keyframes fadeSlideIn {

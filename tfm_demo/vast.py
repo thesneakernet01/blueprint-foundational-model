@@ -300,9 +300,63 @@ def _first_line(exc: Exception) -> str:
     return str(exc).split("\n", 1)[0][:300]
 
 
+class _RangedObject(io.RawIOBase):
+    """Minimal seekable read-only file over S3 ranged GETs — just enough for
+    pyarrow to parse a Parquet footer without downloading the object."""
+
+    def __init__(self, client, bucket: str, key: str, size: int):
+        super().__init__()
+        self._client, self._bucket, self._key = client, bucket, key
+        self._size, self._pos = size, 0
+
+    def readable(self) -> bool:
+        return True
+
+    def seekable(self) -> bool:
+        return True
+
+    def tell(self) -> int:
+        return self._pos
+
+    def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
+        base = {io.SEEK_SET: 0, io.SEEK_CUR: self._pos,
+                io.SEEK_END: self._size}[whence]
+        self._pos = max(0, base + offset)
+        return self._pos
+
+    def read(self, n: int = -1) -> bytes:
+        if n is None or n < 0:
+            n = self._size - self._pos
+        if n <= 0 or self._pos >= self._size:
+            return b""
+        end = min(self._size, self._pos + n) - 1
+        body = self._client.get_object(
+            Bucket=self._bucket, Key=self._key,
+            Range=f"bytes={self._pos}-{end}",
+        )["Body"].read()
+        self._pos += len(body)
+        return body
+
+
+def _footer_rows(client, bucket: str, key: str, size: int) -> int:
+    """Row count from the Parquet footer, via ranged GETs. Fallback for stores
+    that don't return the x-amz-meta-rows user metadata (the original VAST
+    endpoint dropped user metadata on multipart uploads; some gateways strip
+    it too). Returns 0 when the object can't be parsed as Parquet — which is
+    also what a reader would find, so "not ready" is the honest answer."""
+    import pyarrow.parquet as pq
+
+    try:
+        return pq.ParquetFile(_RangedObject(client, bucket, key, size)).metadata.num_rows
+    except Exception as exc:                                       # noqa: BLE001
+        log.info("[vast] footer read of %s failed: %s", key, _first_line(exc))
+        return 0
+
+
 def check() -> Dict:
-    """Probe the bucket and report per-split row counts (from the object
-    metadata stamped at write time). Never raises — errors land in 'error'."""
+    """Probe the bucket and report per-split row counts — from the object
+    metadata stamped at write time when the store returns it, else from the
+    Parquet footer. Never raises — errors land in 'error'."""
     settings = get_vast_settings()
     out: Dict = {
         "ok": False,
@@ -316,12 +370,22 @@ def check() -> Dict:
         client, bucket = _client(read_timeout=30)
         client.head_bucket(Bucket=bucket)
         for table in SPLIT_TABLES.values():
+            key = _key(table)
             try:
-                head = client.head_object(Bucket=bucket, Key=_key(table))
-            except Exception:                                      # noqa: BLE001
+                head = client.head_object(Bucket=bucket, Key=key)
+            except Exception as exc:                               # noqa: BLE001
+                log.info("[vast] head of %s failed (treating split as "
+                         "missing): %s", key, _first_line(exc))
                 continue                                           # missing split
-            rows = (head.get("Metadata") or {}).get(_ROWS_META)
-            out["tables"][table] = int(rows) if rows and rows.isdigit() else 0
+            meta = {k.lower(): v for k, v in (head.get("Metadata") or {}).items()}
+            rows = meta.get(_ROWS_META)
+            if rows and rows.isdigit():
+                out["tables"][table] = int(rows)
+            elif head.get("ContentLength"):
+                out["tables"][table] = _footer_rows(client, bucket, key,
+                                                    head["ContentLength"])
+            else:
+                out["tables"][table] = 0
         out["ok"] = True
     except Exception as exc:                                       # noqa: BLE001
         out["error"] = _first_line(exc)

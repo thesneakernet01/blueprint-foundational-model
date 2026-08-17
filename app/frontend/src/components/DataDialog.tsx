@@ -7,15 +7,18 @@ import {
   HardDrive,
   Loader2,
   Plug,
+  RotateCcw,
   X,
 } from 'lucide-react';
 import {
+  deleteDataSettings,
   getDataSettings,
   getPrepareStatus,
   postDataSettings,
   startPrepare,
   type DataBackend,
   type DataCheck,
+  type DataSettings,
   type PrepareStatus,
   type ExportState,
 } from '../api';
@@ -98,6 +101,8 @@ export default function DataDialog({ open, onClose }: Props) {
 
   const [check, setCheck] = useState<DataCheck | null>(null);
   const [testing, setTesting] = useState(false);
+  const [resetArmed, setResetArmed] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [reqError, setReqError] = useState<string | null>(null);
 
   const [prep, setPrep] = useState<PrepareStatus | null>(null);
@@ -132,23 +137,24 @@ export default function DataDialog({ open, onClose }: Props) {
     pollRef.current = window.setInterval(poll, POLL_MS);
   }, [poll, stopPolling]);
 
+  const applySettings = useCallback((s: DataSettings) => {
+    setBackend(s.backend);
+    setConnection(s.impala.connection);
+    setDatabase(s.impala.database);
+    setEndpoint(s.vast.endpoint);
+    setBucket(s.vast.bucket);
+    setPrefix(s.vast.prefix);
+    setAccessKey(s.vast.access_key);
+    setSecretKey('');
+    setSecretSet(Boolean(s.vast.secret_set));
+  }, []);
+
   // On open: load the saved settings and pick up an already-running load.
   useEffect(() => {
     if (!open) return;
     setReqError(null);
-    getDataSettings()
-      .then((s) => {
-        setBackend(s.backend);
-        setConnection(s.impala.connection);
-        setDatabase(s.impala.database);
-        setEndpoint(s.vast.endpoint);
-        setBucket(s.vast.bucket);
-        setPrefix(s.vast.prefix);
-        setAccessKey(s.vast.access_key);
-        setSecretKey('');
-        setSecretSet(Boolean(s.vast.secret_set));
-      })
-      .catch(() => {});
+    setResetArmed(false);
+    getDataSettings().then(applySettings).catch(() => {});
     getPrepareStatus()
       .then((s) => {
         setPrep(s);
@@ -157,7 +163,7 @@ export default function DataDialog({ open, onClose }: Props) {
       })
       .catch(() => {});
     return stopPolling;
-  }, [open, startPolling, stopPolling]);
+  }, [open, applySettings, startPolling, stopPolling]);
 
   // Auto-scroll the log as lines stream in.
   useEffect(() => {
@@ -189,6 +195,26 @@ export default function DataDialog({ open, onClose }: Props) {
       setTesting(false);
     }
   }, [backend, connection, database, endpoint, bucket, prefix, accessKey, secretKey]);
+
+  // Two-click reset: first click arms, second click drops the stored settings
+  // for the selected backend so the env-var defaults show through again.
+  const resetDefaults = useCallback(async () => {
+    if (!resetArmed) {
+      setResetArmed(true);
+      return;
+    }
+    setResetArmed(false);
+    setResetting(true);
+    setReqError(null);
+    setCheck(null);
+    try {
+      applySettings(await deleteDataSettings(backend));
+    } catch (e) {
+      setReqError(e instanceof Error ? e.message : 'Failed to reset data settings');
+    } finally {
+      setResetting(false);
+    }
+  }, [resetArmed, backend, applySettings]);
 
   const runPrepare = useCallback(async () => {
     setPrepBusy(true);
@@ -265,6 +291,7 @@ export default function DataDialog({ open, onClose }: Props) {
                 onClick={() => {
                   setBackend(b);
                   setCheck(null);
+                  setResetArmed(false);
                 }}
                 className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
                   backend === b
@@ -330,24 +357,45 @@ export default function DataDialog({ open, onClose }: Props) {
             </div>
           )}
 
-          <button
-            onClick={saveAndTest}
-            disabled={testing || !configured}
-            className="flex items-center gap-2 bg-surface-3 text-gray-700 hover:bg-surface-4 px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {testing ? (
-              <>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={saveAndTest}
+              disabled={testing || resetting || !configured}
+              className="flex items-center gap-2 bg-surface-3 text-gray-700 hover:bg-surface-4 px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {testing ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  {backend === 'impala'
+                    ? 'Connecting… (a suspended warehouse can take a minute)'
+                    : 'Probing the bucket…'}
+                </>
+              ) : (
+                <>
+                  <Plug className="w-3.5 h-3.5" /> Save &amp; test connection
+                </>
+              )}
+            </button>
+            <button
+              onClick={resetDefaults}
+              disabled={testing || resetting}
+              title={`Forget the saved ${BACKEND_META[backend].label} settings (secrets included); env-var defaults apply again`}
+              className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                resetArmed
+                  ? 'bg-status-amber/15 border-status-amber/60 text-status-amber'
+                  : 'bg-surface-0 border-surface-3 text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              {resetting ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                {backend === 'impala'
-                  ? 'Connecting… (a suspended warehouse can take a minute)'
-                  : 'Probing the bucket…'}
-              </>
-            ) : (
-              <>
-                <Plug className="w-3.5 h-3.5" /> Save &amp; test connection
-              </>
-            )}
-          </button>
+              ) : (
+                <RotateCcw className="w-3.5 h-3.5" />
+              )}
+              {resetArmed
+                ? 'Click again to confirm'
+                : `Reset ${BACKEND_META[backend].label} to defaults`}
+            </button>
+          </div>
 
           {reqError && (
             <div className="px-4 py-3 bg-status-red-dim/30 border border-status-red/40 rounded-lg text-sm text-status-red">

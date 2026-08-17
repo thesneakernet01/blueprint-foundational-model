@@ -104,12 +104,41 @@ def save_data_settings(cfg: Dict) -> Dict:
         if not vast["secret_key"]:                    # keep the stored secret
             vast["secret_key"] = (_read_file().get("vast") or {}).get("secret_key", "")
         payload = {"backend": backend, "impala": impala, "vast": vast}
-        tmp = _PATH.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps(payload, indent=2))
-        tmp.chmod(0o600)                              # may hold the secret key
-        tmp.replace(_PATH)
-        _LEGACY_PATH.unlink(missing_ok=True)
+        _write(payload)
     return payload
+
+
+def _write(payload: Dict) -> None:
+    tmp = _PATH.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(payload, indent=2))
+    tmp.chmod(0o600)                                  # may hold the secret key
+    tmp.replace(_PATH)
+    _LEGACY_PATH.unlink(missing_ok=True)
+
+
+def reset_data_settings(scope: str = "all") -> Dict:
+    """Drop stored Data-dialog settings so the env-var defaults (or blanks)
+    show through again; returns the resulting settings view.
+
+    scope "impala" / "vast" blanks that backend's stored fields (the VAST
+    secret key included) while keeping the other backend and the stored
+    backend choice; "all" removes the settings file entirely — backend choice
+    included, so the fresh-project default logic applies again.
+    """
+    if scope not in BACKENDS + ("all",):
+        raise ValueError(
+            f"unknown reset scope {scope!r} — use one of {BACKENDS + ('all',)}")
+    with _LOCK:
+        if scope == "all":
+            _PATH.unlink(missing_ok=True)
+            _LEGACY_PATH.unlink(missing_ok=True)
+        else:
+            data = _read_file()
+            data[scope] = {}
+            _write({"backend": data.get("backend") or "",
+                    "impala": data.get("impala") or {},
+                    "vast": data.get("vast") or {}})
+    return get_data_settings()
 
 
 # --------------------------------------------------------------------------- #

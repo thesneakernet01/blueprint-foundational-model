@@ -25,7 +25,7 @@ from .config import MODEL_DIR, cors_origins
 from .engine import Engine
 from .jobs import ExportManager, PrepManager, RegistryManager
 from .schemas import DataConfig, NexusConfig, Txn
-from .settings import get_data_settings, save_data_settings
+from .settings import get_data_settings, reset_data_settings, save_data_settings
 
 # Single process-wide engine; warmed up on startup by the lifespan hook.
 engine = Engine()
@@ -173,6 +173,17 @@ def create_app() -> FastAPI:
         except ValueError as exc:
             return JSONResponse({"error": str(exc)}, status_code=422)
         return JSONResponse({**_masked_settings(), "check": storage.check()})
+
+    @app.delete("/api/data")
+    def data_reset(scope: str = "all") -> JSONResponse:
+        """Drop stored storage settings (?scope=impala|vast|all) so the
+        env-var defaults apply again; "all" also forgets the backend choice.
+        Returns the resulting (masked) settings."""
+        try:
+            reset_data_settings(scope)
+        except ValueError as exc:
+            return JSONResponse({"error": str(exc)}, status_code=422)
+        return JSONResponse(_masked_settings())
 
     # ---- NEXUS head mode (settable from the Build-artifacts dialog) --------
     @app.get("/api/nexus")

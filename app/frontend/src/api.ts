@@ -359,6 +359,17 @@ export async function postDataSettings(cfg: DataSettings): Promise<DataSettings 
   return body;
 }
 
+/** Drop the stored settings for one backend (or everything, backend choice
+ *  included) so the env-var defaults apply again; returns the result. */
+export async function deleteDataSettings(scope: DataBackend | 'all'): Promise<DataSettings> {
+  const res = await fetch(`${API_BASE}/api/data?scope=${scope}`, { method: 'DELETE' });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(body?.error ?? `/api/data → ${res.status} ${res.statusText}`);
+  }
+  return body;
+}
+
 /** Data-load (TabFormer download → split → storage) job status; same shape as
  *  ExportStatus except summary is the post-load storage check. */
 export interface PrepareStatus {

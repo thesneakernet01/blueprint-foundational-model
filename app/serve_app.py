@@ -52,13 +52,23 @@ def main() -> None:
 
     # The SPA bundle must exist for `vite preview`; build it if a prior Job
     # didn't (e.g. running this entrypoint standalone).
-    if not (root / "app" / "frontend" / "dist" / "index.html").exists():
+    frontend_dir = root / "app" / "frontend"
+    if not (frontend_dir / "dist" / "index.html").exists():
         print("serve_app: frontend/dist missing — building it now")
         build()
 
     node_bin = ensure_node()
     env = npm_env(node_bin)
     env["BACKEND_PORT"] = str(backend_port)
+
+    # `vite preview` needs the npm toolchain even when dist/ is committed —
+    # node_modules is gitignored, so a fresh clone (or a layout change moving
+    # frontend/) has the bundle but no vite. Install deps before serving.
+    if not (frontend_dir / "node_modules" / ".bin" / "vite").exists():
+        print("serve_app: frontend toolchain missing — npm ci")
+        install = (["npm", "ci"] if (frontend_dir / "package-lock.json").exists()
+                   else ["npm", "install"])
+        subprocess.run(install, cwd=str(frontend_dir), env=env, check=True)
 
     # Backend: bind the private port directly via uvicorn, bypassing the
     # CDSW_APP_PORT logic in config.server_host_port (that port is the UI's).

@@ -32,6 +32,43 @@ import {
   type UmapPoint,
 } from './api';
 
+/** Footer partner mark tinted to its brand color. The shipped assets are
+ *  white, so the image is used as an alpha mask over a brand-color fill —
+ *  Cloudera orange #FF550C (deck), VAST cyan #1FD9FE (their brand spec),
+ *  Fundamental violet #3D2E96 (fundamental.tech chrome). The className must
+ *  set explicit h/w (masked spans have no intrinsic size). */
+function PartnerLogo({
+  src,
+  label,
+  color,
+  className,
+}: {
+  src: string;
+  label: string;
+  color: string;
+  className: string;
+}) {
+  const mask: React.CSSProperties = {
+    backgroundColor: color,
+    WebkitMaskImage: `url("${src}")`,
+    maskImage: `url("${src}")`,
+    WebkitMaskSize: 'contain',
+    maskSize: 'contain',
+    WebkitMaskRepeat: 'no-repeat',
+    maskRepeat: 'no-repeat',
+    WebkitMaskPosition: 'center',
+    maskPosition: 'center',
+  };
+  return (
+    <span
+      role="img"
+      aria-label={label}
+      className={`inline-block opacity-90 hover:opacity-100 transition-opacity ${className}`}
+      style={mask}
+    />
+  );
+}
+
 export default function App() {
   const [status, setStatus] = useState<StatusResp | null>(null);
   const [statusError, setStatusError] = useState(false);
@@ -138,13 +175,13 @@ export default function App() {
         )}
       </main>
 
-      {/* partner strip — bottom right */}
+      {/* partner strip — bottom right, each mark in its brand color */}
       <footer className="px-4 sm:px-6 lg:px-8 pb-4 max-w-[1400px] w-full mx-auto">
         <div className="flex items-center justify-end gap-7">
           <span className="text-[9px] uppercase tracking-[0.2em] text-gray-500">powered by</span>
-          <img src={clouderaLogo} alt="Cloudera" className="h-4 opacity-60 hover:opacity-100 transition-opacity invert" />
-          <img src={vastLogo} alt="VAST Data" className="h-[15px] opacity-60 hover:opacity-100 transition-opacity invert" />
-          <img src={fundamentalLogo} alt="Fundamental (NEXUS)" className="h-[18px] opacity-60 hover:opacity-100 transition-opacity invert" />
+          <PartnerLogo src={clouderaLogo} label="Cloudera" color="#FF550C" className="h-4 w-[129px]" />
+          <PartnerLogo src={vastLogo} label="VAST Data" color="#1FD9FE" className="h-[15px] w-[71px]" />
+          <PartnerLogo src={fundamentalLogo} label="Fundamental (NEXUS)" color="#3D2E96" className="h-[18px] w-[134px]" />
         </div>
       </footer>
 

@@ -148,6 +148,12 @@ export default function App() {
         </div>
       </footer>
 
+      {/* brand accent bar — mirrors the orange bottom edge of Cloudera deck
+          body slides (#FF550C → ORANGE_LT #FE8756 from the toolkit palette).
+          Fixed so it shows on every "slide", like the deck chrome; z-30 keeps
+          it under the modals' z-50 backdrops. */}
+      <div className="fixed bottom-0 inset-x-0 h-2 bg-gradient-to-r from-accent to-[#FE8756] z-30" />
+
       <ExportDialog
         open={exportOpen}
         onClose={() => setExportOpen(false)}

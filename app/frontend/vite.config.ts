@@ -38,5 +38,9 @@ export default defineConfig({
     strictPort: true,
     proxy,
     allowedHosts: true,
+    // Browsers heuristically cache index.html without cache headers; after a
+    // redeploy that stale page points at asset hashes that no longer exist
+    // and renders blank. A demo can afford to never cache.
+    headers: { 'Cache-Control': 'no-store' },
   },
 });

@@ -17,7 +17,10 @@ optional **NEXUS LTM** head. The implementation lives in the root packages (see
 | Model Registry + CML Model deploy | `tfm_demo/registry.py` (+ `tfm_demo/registry_predict.py` fallback) |
 | Checkpoint | `models/` (root, gitignored) |
 
-`notebooks/` and `inference/` *(add as needed)*.
+`notebooks/tfm_training_walkthrough.ipynb` — an executable visual walkthrough of the
+training pipeline (data → embeddings → PCA → heads → registry) for data scientists and
+analysts; degrades honestly to a labelled synthetic sample off-GPU. `inference/` *(add as
+needed)*.
 
 ## Conventions
 

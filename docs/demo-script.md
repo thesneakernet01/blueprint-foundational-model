@@ -157,6 +157,12 @@ That's the difference between a model demo and an operating model."
 - [ ] Registry panel enabled (on CML with APIv2 key injected) if beat 6 is in
       scope; otherwise skip beat 6 or show the disabled panel honestly.
 
+### Technical deep-dive
+
+For a data-scientist audience, open `ai/notebooks/tfm_training_walkthrough.ipynb` — the
+same pipeline as beats 4–6, one executable stage at a time, with the training-budget
+economics spelled out for business stakeholders.
+
 ### Failure-mode talking points
 
 - **DEMO-FALLBACK badge:** "the UI runs anywhere; scores are synthetic and

@@ -38,13 +38,10 @@ export default function RegistryPanel({ registry, onRefresh, exportRunning }: Pr
 
   return (
     <div
-      className={`bg-surface-2 rounded-lg border border-surface-3 p-4 ${unavailable ? 'opacity-80' : ''}`}
+      className={`panel p-4 ${unavailable ? 'opacity-80' : ''}`}
     >
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-medium text-gray-700 flex items-center gap-2">
-          <BookMarked className="w-4 h-4 text-accent" />
-          Cloudera Model Registry
-        </h3>
+        <h3 className="slide-title">Cloudera Model Registry</h3>
         <span className="text-[10px] font-mono text-gray-500">{registry.model_name}</span>
       </div>
 
@@ -137,7 +134,7 @@ export default function RegistryPanel({ registry, onRefresh, exportRunning }: Pr
       )}
 
       <div>
-        <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5">
+        <div className="text-[10px] font-mono lowercase text-gray-400 mb-1.5">
           Registered versions
         </div>
         {registry.versions.length === 0 ? (

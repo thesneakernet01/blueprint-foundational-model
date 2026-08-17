@@ -41,9 +41,9 @@ export default function MetricTrend({ runs }: Props) {
   );
 
   return (
-    <div className="bg-surface-2 rounded-lg border border-surface-3 p-4">
+    <div className="panel p-4">
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-medium text-gray-700">Model quality per training run</h3>
+        <h3 className="slide-title">Model quality per training run</h3>
         <div className="flex items-center gap-1 bg-surface-3 rounded-md p-0.5">
           {(Object.keys(METRIC_LABEL) as Metric[]).map((m) => (
             <button

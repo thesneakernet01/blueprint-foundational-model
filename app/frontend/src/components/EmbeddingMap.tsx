@@ -84,10 +84,10 @@ export default function EmbeddingMap({ umap, result, expected }: Props) {
   const hasData = umap.length > 0 || live.length > 0;
 
   return (
-    <div className="bg-surface-2 rounded-lg border border-surface-3 p-4">
+    <div className="panel p-4">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-medium text-gray-700">Embedding map</h2>
-        <span className="text-[10px] uppercase tracking-wider text-gray-500">UMAP · test set</span>
+        <h2 className="slide-title">Embedding map</h2>
+        <span className="text-[10px] font-mono lowercase text-gray-400">UMAP · test set</span>
       </div>
 
       <div className="h-[300px] rounded-lg border border-surface-3 bg-surface-0/40">

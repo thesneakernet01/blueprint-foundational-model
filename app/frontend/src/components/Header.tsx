@@ -1,4 +1,3 @@
-import { Activity, Cpu, Database, GitBranch, Hammer, ShieldAlert, Zap } from 'lucide-react';
 import type { StatusResp } from '../api';
 
 export type View = 'inference' | 'lifecycle';
@@ -12,6 +11,11 @@ interface Props {
   onData: () => void;
 }
 
+const VIEWS: { key: View; label: string }[] = [
+  { key: 'inference', label: 'Inference' },
+  { key: 'lifecycle', label: 'Model Lifecycle' },
+];
+
 function StatusDot({ tone }: { tone: 'green' | 'amber' | 'neutral' }) {
   const cls =
     tone === 'green'
@@ -19,13 +23,8 @@ function StatusDot({ tone }: { tone: 'green' | 'amber' | 'neutral' }) {
       : tone === 'amber'
         ? 'bg-status-amber'
         : 'bg-surface-4';
-  return <span className={`w-2 h-2 rounded-full ${cls}`} />;
+  return <span className={`w-1.5 h-1.5 rounded-full ${cls}`} />;
 }
-
-const VIEWS: { key: View; label: string; icon: typeof Zap }[] = [
-  { key: 'inference', label: 'Inference', icon: Zap },
-  { key: 'lifecycle', label: 'Model Lifecycle', icon: GitBranch },
-];
 
 export default function Header({ status, error, view, onViewChange, onBuild, onData }: Props) {
   const real = status?.mode === 'real';
@@ -34,8 +33,8 @@ export default function Header({ status, error, view, onViewChange, onBuild, onD
     : !status
       ? 'connecting…'
       : real
-        ? `REAL · ${status.gpu ? 'GPU' : 'CPU'}`
-        : 'DEMO-FALLBACK';
+        ? `live · ${status.gpu ? 'GPU' : 'CPU'}`
+        : 'demo fallback';
   const modeTone: 'green' | 'amber' | 'neutral' = error
     ? 'neutral'
     : real
@@ -43,63 +42,59 @@ export default function Header({ status, error, view, onViewChange, onBuild, onD
       : 'amber';
 
   return (
-    <header className="bg-surface-1 border-b border-surface-3 px-6 py-3 flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-accent/10 rounded-lg">
-          <ShieldAlert className="w-5 h-5 text-accent" />
-        </div>
+    <header className="bg-surface-1 border-b border-surface-3 px-6 flex items-stretch justify-between gap-6">
+      <div className="flex items-center gap-3 py-3.5">
+        <span className="w-[3px] self-stretch rounded-full bg-accent" aria-hidden />
         <div>
-          <h1 className="text-lg font-semibold text-ink leading-tight">
+          <h1 className="text-[15px] font-semibold text-brand-indigo leading-tight tracking-[-0.01em]">
             Transaction Foundation Model
           </h1>
-          <p className="text-xs text-gray-500">
-            Live Fraud Inference · NeMo AutoModel + RAPIDS
-          </p>
+          <p className="text-[11px] text-gray-500">Live fraud inference on Cloudera AI</p>
         </div>
       </div>
 
-      <div className="flex items-center gap-1 bg-surface-2 border border-surface-3 rounded-lg p-0.5">
-        {VIEWS.map(({ key, label, icon: Icon }) => (
+      <nav className="flex items-stretch gap-7">
+        {VIEWS.map(({ key, label }) => (
           <button
             key={key}
             onClick={() => onViewChange(key)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              view === key
-                ? 'bg-accent/15 text-accent'
-                : 'text-gray-600 hover:text-gray-800 hover:bg-surface-3'
+            className={`relative text-[13px] font-medium transition-colors ${
+              view === key ? 'text-brand-indigo' : 'text-gray-500 hover:text-brand-indigo'
             }`}
           >
-            <Icon className="w-3.5 h-3.5" />
             {label}
+            {view === key && (
+              <span className="absolute -bottom-px inset-x-0 h-[2px] bg-accent" aria-hidden />
+            )}
           </button>
         ))}
-      </div>
+      </nav>
 
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2 text-xs">
-          <StatusDot tone={modeTone} />
-          <Activity className="w-3.5 h-3.5 text-gray-600" />
-          <span className="text-gray-600">{modeLabel}</span>
+      <div className="flex items-center gap-5 py-3.5">
+        <div className="flex items-center gap-4 text-[11px] text-gray-500">
+          <span className="flex items-center gap-1.5">
+            <StatusDot tone={modeTone} />
+            {modeLabel}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <StatusDot tone={status?.gpu ? 'green' : 'neutral'} />
+            {status?.gpu ? 'CUDA' : 'no GPU'}
+          </span>
         </div>
-        <div className="flex items-center gap-2 text-xs">
-          <StatusDot tone={status?.gpu ? 'green' : 'neutral'} />
-          <Cpu className="w-3.5 h-3.5 text-gray-600" />
-          <span className="text-gray-600">{status?.gpu ? 'CUDA ready' : 'no GPU'}</span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onData}
+            className="border border-surface-4 text-gray-700 hover:border-accent/60 hover:text-accent px-3 py-1.5 text-xs font-medium rounded-md transition-colors"
+          >
+            Data
+          </button>
+          <button
+            onClick={onBuild}
+            className="bg-accent text-white hover:bg-accent/90 px-3 py-1.5 text-xs font-medium rounded-md transition-colors"
+          >
+            Build artifacts
+          </button>
         </div>
-        <button
-          onClick={onData}
-          className="flex items-center gap-1.5 bg-surface-3 text-gray-700 hover:bg-surface-4 px-3 py-1.5 text-xs font-medium rounded-md transition-colors"
-        >
-          <Database className="w-3.5 h-3.5" />
-          Data
-        </button>
-        <button
-          onClick={onBuild}
-          className="flex items-center gap-1.5 bg-surface-3 text-gray-700 hover:bg-surface-4 px-3 py-1.5 text-xs font-medium rounded-md transition-colors"
-        >
-          <Hammer className="w-3.5 h-3.5" />
-          Build artifacts
-        </button>
       </div>
     </header>
   );

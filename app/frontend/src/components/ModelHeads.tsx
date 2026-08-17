@@ -47,10 +47,10 @@ function meta(key: string, summary: Summary | null, result: ScoreResp): string {
 
 export default function ModelHeads({ result, summary, scoring, error }: Props) {
   return (
-    <div className="bg-surface-2 rounded-lg border border-surface-3 p-4">
+    <div className="panel p-4">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-medium text-gray-700">Model heads</h2>
-        <span className="text-[10px] uppercase tracking-wider text-gray-500">
+        <h2 className="slide-title">Model heads</h2>
+        <span className="text-[10px] font-mono lowercase text-gray-400">
           {result && 'nexus' in result.scores
             ? 'raw · embeddings · combined · ltm'
             : 'raw · embeddings · combined'}

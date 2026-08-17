@@ -31,6 +31,7 @@ export default {
         'brand-blue-soft': '#8789FB',
         'brand-gray': '#A8AFB9',
         ink: '#1A1A26',
+        'brand-indigo': '#110046',   // deck headline color (text use)
       },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',

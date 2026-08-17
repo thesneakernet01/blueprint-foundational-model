@@ -55,8 +55,8 @@ export default function LifecycleStrip({ runs, registry, exportRunning }: Props)
           : 'border-surface-4 text-gray-500';
 
   return (
-    <div className="bg-surface-2 rounded-lg border border-surface-3 p-4">
-      <h3 className="text-sm font-medium text-gray-700 mb-3">Lifecycle on Cloudera AI</h3>
+    <div className="panel p-4">
+      <h3 className="slide-title mb-3">Lifecycle on Cloudera AI</h3>
       <div className="space-y-2">
         {stages.map((s) => (
           <div

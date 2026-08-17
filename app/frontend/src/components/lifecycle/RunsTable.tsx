@@ -9,8 +9,8 @@ const fmt = (v: number | null | undefined) => (v == null ? '—' : v.toFixed(4))
 
 export default function RunsTable({ runs }: Props) {
   return (
-    <div className="bg-surface-2 rounded-lg border border-surface-3 p-4">
-      <h3 className="text-sm font-medium text-gray-700 mb-2">Run history</h3>
+    <div className="panel p-4">
+      <h3 className="slide-title mb-2">Run history</h3>
       {runs.length === 0 ? (
         <p className="text-[11px] text-gray-400 py-6 text-center">
           Run Build artifacts to record run #1.

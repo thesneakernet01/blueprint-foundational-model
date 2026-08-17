@@ -44,9 +44,9 @@ export default function PipelineFlow({ status, lastRun, nexusOn }: Props) {
   };
 
   return (
-    <div className="bg-surface-2 rounded-lg border border-surface-3 p-4">
+    <div className="panel p-4">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-medium text-gray-700">Training pipeline</h3>
+        <h3 className="slide-title">Training pipeline</h3>
         <span className="text-[11px] text-gray-500 font-mono">
           {running
             ? `running · ${fmtDuration(status?.elapsed_sec)}`

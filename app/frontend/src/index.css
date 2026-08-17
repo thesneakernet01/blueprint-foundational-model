@@ -83,6 +83,36 @@ samp {
   animation: pulseGlowAccent 2s ease-in-out infinite;
 }
 
+/* ---- deck chrome ---------------------------------------------------------
+   Panels and headlines borrowed from the Cloudera deck's body slides: white
+   panels lifted by a soft indigo-tinted shadow instead of boxed borders, and
+   section titles set in deck indigo under a short orange tick. */
+.panel {
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow:
+    0 1px 2px rgba(16, 0, 70, 0.05),
+    0 8px 28px -10px rgba(16, 0, 70, 0.1);
+}
+.slide-title {
+  color: #110046;
+  font-weight: 600;
+  font-size: 0.875rem;
+  letter-spacing: -0.01em;
+}
+.slide-title::before {
+  content: "";
+  display: block;
+  width: 26px;
+  height: 3px;
+  border-radius: 1px;
+  background: #ff550c;
+  margin-bottom: 7px;
+}
+.slide-title-lg {
+  font-size: 1.125rem;
+}
+
 /* Pipeline-flow connectors: a dotted line whose dots march toward the active
    stage (Template-D animated-connector idiom from the design spec). */
 .connector {

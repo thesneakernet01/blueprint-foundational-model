@@ -97,7 +97,7 @@ export default function LifecycleDashboard({ onBuild }: Props) {
       {/* header row: run count, next budget, actions */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-ink">Model Lifecycle</h2>
+          <h2 className="slide-title slide-title-lg">Model Lifecycle</h2>
           <p className="text-xs text-gray-500">
             Train → register → deploy → observe, all inside Cloudera AI Workbench
             {runs.length > 0 && (

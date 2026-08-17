@@ -33,8 +33,8 @@ export default function BudgetChart({ runs, schedule }: Props) {
 
   if (runs.length === 0) {
     return (
-      <div className="bg-surface-2 rounded-lg border border-surface-3 p-4">
-        <h3 className="text-sm font-medium text-gray-700 mb-2">Training budget schedule</h3>
+      <div className="panel p-4">
+        <h3 className="slide-title mb-2">Training budget schedule</h3>
         <p className="text-[11px] text-gray-400 mb-3">
           Each run earns a bigger budget — rows embedded per split and boosting rounds:
         </p>
@@ -59,9 +59,9 @@ export default function BudgetChart({ runs, schedule }: Props) {
   }
 
   return (
-    <div className="bg-surface-2 rounded-lg border border-surface-3 p-4 space-y-3">
+    <div className="panel p-4 space-y-3">
       <div>
-        <h3 className="text-sm font-medium text-gray-700 mb-1">Training budget per run</h3>
+        <h3 className="slide-title mb-1">Training budget per run</h3>
         <ResponsiveContainer width="100%" height={130}>
           <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
             <CartesianGrid stroke={CHART.grid} strokeDasharray="3 3" vertical={false} />

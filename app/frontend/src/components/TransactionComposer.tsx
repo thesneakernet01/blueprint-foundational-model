@@ -81,10 +81,10 @@ export default function TransactionComposer({ form, setForm, examples, onLoadExa
     setForm({ ...form, [k]: e.target.value });
 
   return (
-    <div className="bg-surface-2 rounded-lg border border-surface-3 p-4">
+    <div className="panel p-4">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-medium text-gray-700">Transaction input</h2>
-        <span className="text-[10px] uppercase tracking-wider text-gray-500">compose</span>
+        <h2 className="slide-title">Transaction input</h2>
+        <span className="text-[10px] font-mono lowercase text-gray-400">compose</span>
       </div>
 
       {examples.length > 0 && (

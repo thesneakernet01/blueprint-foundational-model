@@ -27,7 +27,7 @@ export default function RegistryPanel({ registry, onRefresh, exportRunning }: Pr
   };
 
   if (!registry) {
-    return <div className="bg-surface-2 rounded-lg border border-surface-3 p-4 h-40 animate-pulse" />;
+    return <div className="bg-surface-3 rounded-lg border border-surface-3 p-4 h-40 animate-pulse" />;
   }
 
   const unavailable = !registry.available;
@@ -41,7 +41,7 @@ export default function RegistryPanel({ registry, onRefresh, exportRunning }: Pr
       className={`bg-surface-2 rounded-lg border border-surface-3 p-4 ${unavailable ? 'opacity-80' : ''}`}
     >
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-medium text-gray-300 flex items-center gap-2">
+        <h3 className="text-sm font-medium text-gray-700 flex items-center gap-2">
           <BookMarked className="w-4 h-4 text-accent" />
           Cloudera Model Registry
         </h3>
@@ -51,7 +51,7 @@ export default function RegistryPanel({ registry, onRefresh, exportRunning }: Pr
       {unavailable && (
         <div className="flex items-start gap-2 bg-surface-3/60 border border-surface-4 rounded-md px-3 py-2 mb-3">
           <Lock className="w-3.5 h-3.5 text-gray-500 mt-0.5 shrink-0" />
-          <p className="text-[11px] text-gray-400 leading-snug">
+          <p className="text-[11px] text-gray-600 leading-snug">
             Available when running on Cloudera AI — {registry.reason}.
           </p>
         </div>
@@ -89,7 +89,7 @@ export default function RegistryPanel({ registry, onRefresh, exportRunning }: Pr
                 ? 'register a version first'
                 : undefined
           }
-          className="flex items-center gap-1.5 bg-surface-3 text-gray-300 hover:bg-surface-4 px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex items-center gap-1.5 bg-surface-3 text-gray-700 hover:bg-surface-4 px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {jobRunning && registry.job.action === 'deploy' ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -128,7 +128,7 @@ export default function RegistryPanel({ registry, onRefresh, exportRunning }: Pr
       {(jobRunning || registry.job.log.length > 0) && (
         <div
           ref={logRef}
-          className="bg-surface-1 border border-surface-4 rounded-md p-2 max-h-28 overflow-y-auto font-mono text-[10px] text-gray-400 space-y-0.5 mb-3"
+          className="bg-surface-1 border border-surface-4 rounded-md p-2 max-h-28 overflow-y-auto font-mono text-[10px] text-gray-600 space-y-0.5 mb-3"
         >
           {registry.job.log.map((line, i) => (
             <div key={i}>{line}</div>
@@ -141,7 +141,7 @@ export default function RegistryPanel({ registry, onRefresh, exportRunning }: Pr
           Registered versions
         </div>
         {registry.versions.length === 0 ? (
-          <p className="text-[11px] text-gray-600">
+          <p className="text-[11px] text-gray-400">
             {unavailable
               ? 'Versions appear here once the app runs on Cloudera AI.'
               : 'None yet — register the latest run to create v1.'}
@@ -153,7 +153,7 @@ export default function RegistryPanel({ registry, onRefresh, exportRunning }: Pr
                 key={`${v.version}-${i}`}
                 className="flex items-center justify-between text-[11px] bg-surface-3/50 rounded px-2 py-1"
               >
-                <span className="font-mono text-gray-200">v{v.version ?? '?'}</span>
+                <span className="font-mono text-gray-800">v{v.version ?? '?'}</span>
                 <span className="text-gray-500 font-mono">{v.created_at}</span>
               </div>
             ))}

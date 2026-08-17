@@ -43,14 +43,14 @@ export default function MetricTrend({ runs }: Props) {
   return (
     <div className="bg-surface-2 rounded-lg border border-surface-3 p-4">
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-medium text-gray-300">Model quality per training run</h3>
+        <h3 className="text-sm font-medium text-gray-700">Model quality per training run</h3>
         <div className="flex items-center gap-1 bg-surface-3 rounded-md p-0.5">
           {(Object.keys(METRIC_LABEL) as Metric[]).map((m) => (
             <button
               key={m}
               onClick={() => setMetric(m)}
               className={`px-2 py-1 text-[11px] font-medium rounded transition-colors ${
-                metric === m ? 'bg-accent/20 text-accent' : 'text-gray-500 hover:text-gray-300'
+                metric === m ? 'bg-accent/20 text-accent' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               {METRIC_LABEL[m]}
@@ -62,8 +62,8 @@ export default function MetricTrend({ runs }: Props) {
       {runs.length === 0 ? (
         <div className="h-[260px] flex items-center justify-center text-center">
           <div>
-            <p className="text-gray-400 text-sm">No training runs recorded yet</p>
-            <p className="text-[11px] text-gray-600 mt-1.5">
+            <p className="text-gray-600 text-sm">No training runs recorded yet</p>
+            <p className="text-[11px] text-gray-400 mt-1.5">
               Each run of Build artifacts is granted a larger training budget — this chart
               tracks the improvement, with markers for registered model versions.
             </p>

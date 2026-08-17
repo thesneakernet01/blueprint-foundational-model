@@ -14,14 +14,14 @@
 
 html,
 body {
-  background-color: #0a0328; /* surface-0 */
+  background-color: #f5f5fa; /* surface-0 */
 }
 
 body {
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  color: #e5e7eb;
+  color: #1a1a26; /* deck NEAR_BLACK */
 }
 
 code,
@@ -36,18 +36,18 @@ samp {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #110046; /* surface-1 */
+  background: #f5f5fa; /* surface-0 */
 }
 ::-webkit-scrollbar-thumb {
-  background: #332979; /* surface-4 */
+  background: #c9c9dd;
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #43389a;
+  background: #a9a9c6;
 }
 * {
   scrollbar-width: thin;
-  scrollbar-color: #332979 #110046;
+  scrollbar-color: #c9c9dd #f5f5fa;
 }
 
 @keyframes fadeSlideIn {
@@ -95,7 +95,7 @@ samp {
 /* Pipeline-flow connectors: a dotted line whose dots march toward the active
    stage (Template-D animated-connector idiom from the design spec). */
 .connector {
-  background-image: radial-gradient(circle, #332979 1.5px, transparent 1.5px);
+  background-image: radial-gradient(circle, #c9c9dd 1.5px, transparent 1.5px);
   background-size: 10px 3px;
   background-repeat: repeat-x;
   background-position: 0 center;

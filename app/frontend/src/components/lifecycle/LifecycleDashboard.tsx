@@ -97,13 +97,13 @@ export default function LifecycleDashboard({ onBuild }: Props) {
       {/* header row: run count, next budget, actions */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-white">Model Lifecycle</h2>
+          <h2 className="text-lg font-semibold text-ink">Model Lifecycle</h2>
           <p className="text-xs text-gray-500">
             Train → register → deploy → observe, all inside Cloudera AI Workbench
             {runs.length > 0 && (
               <>
                 {' '}
-                · <span className="font-mono text-gray-400">{runs.length}</span> run
+                · <span className="font-mono text-gray-600">{runs.length}</span> run
                 {runs.length === 1 ? '' : 's'} recorded
               </>
             )}
@@ -113,7 +113,7 @@ export default function LifecycleDashboard({ onBuild }: Props) {
           {next && (
             <span className="text-[11px] text-gray-500">
               Next run:{' '}
-              <span className="font-mono text-gray-300">
+              <span className="font-mono text-gray-700">
                 {fmtRows(next.embed_max)} rows · {Math.round(next.xgb_scale * 100)}% rounds
               </span>
             </span>
@@ -138,7 +138,7 @@ export default function LifecycleDashboard({ onBuild }: Props) {
               onClick={() => setConfirmReset(true)}
               disabled={runs.length === 0}
               title="Clear the run history so the demo replays from tier 1"
-              className="flex items-center gap-1.5 border border-surface-4 text-gray-400 hover:border-accent/50 hover:text-accent px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-1.5 border border-surface-4 text-gray-600 hover:border-accent/50 hover:text-accent px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               Reset demo

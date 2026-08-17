@@ -62,8 +62,8 @@ const CHANNELS = ['Online Transaction', 'Swipe Transaction', 'Chip Transaction']
 
 const labelCls = 'block text-[10px] text-gray-500 uppercase tracking-wider mb-1';
 const inputCls =
-  'w-full px-2.5 py-1.5 text-xs bg-surface-3 border border-surface-4 rounded-md text-gray-200 ' +
-  'placeholder-gray-600 font-mono focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20';
+  'w-full px-2.5 py-1.5 text-xs bg-surface-3 border border-surface-4 rounded-md text-gray-800 ' +
+  'placeholder-gray-400 font-mono focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20';
 
 interface Props {
   form: FormState;
@@ -83,7 +83,7 @@ export default function TransactionComposer({ form, setForm, examples, onLoadExa
   return (
     <div className="bg-surface-2 rounded-lg border border-surface-3 p-4">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-medium text-gray-300">Transaction input</h2>
+        <h2 className="text-sm font-medium text-gray-700">Transaction input</h2>
         <span className="text-[10px] uppercase tracking-wider text-gray-500">compose</span>
       </div>
 
@@ -95,7 +95,7 @@ export default function TransactionComposer({ form, setForm, examples, onLoadExa
               onClick={() => onLoadExample(ex)}
               className="text-left bg-surface-3 border border-surface-4 rounded-lg px-3 py-2 transition-colors hover:border-accent/50 hover:bg-surface-3"
             >
-              <div className="text-xs text-gray-200">{ex.label}</div>
+              <div className="text-xs text-gray-800">{ex.label}</div>
               <div className="text-[10px] font-mono text-gray-500 mt-0.5">
                 {String(ex.txn['Amount'] ?? '')} ·{' '}
                 {String(ex.txn['Use Chip'] ?? '').split(' ')[0].toUpperCase()}

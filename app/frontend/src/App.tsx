@@ -88,10 +88,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-surface-0 flex flex-col">
-      {/* top brand rule — mirrors the fixed orange bar at the bottom so the
-          page is framed in Cloudera orange (accent as edge chrome, per the
-          deck; the header surface itself stays brand indigo) */}
-      <div className="h-2 w-full bg-gradient-to-r from-accent to-[#FE8756]" />
       <Header
         status={status}
         error={statusError}
@@ -124,7 +120,7 @@ export default function App() {
               <ModelHeads result={result} summary={summary} scoring={scoring} error={scoreError} />
               <Suspense
                 fallback={
-                  <div className="bg-surface-2 rounded-lg border border-surface-3 p-4 h-[420px] animate-pulse" />
+                  <div className="bg-surface-3 rounded-lg border border-surface-3 p-4 h-[420px] animate-pulse" />
                 }
               >
                 <EmbeddingMap umap={umap} result={result} expected={loadedExample?.expected_position ?? null} />
@@ -134,7 +130,7 @@ export default function App() {
         ) : (
           <Suspense
             fallback={
-              <div className="bg-surface-2 rounded-lg border border-surface-3 p-4 h-[420px] animate-pulse" />
+              <div className="bg-surface-3 rounded-lg border border-surface-3 p-4 h-[420px] animate-pulse" />
             }
           >
             <LifecycleDashboard onBuild={() => setExportOpen(true)} />
@@ -146,9 +142,9 @@ export default function App() {
       <footer className="px-4 sm:px-6 lg:px-8 pb-4 max-w-[1400px] w-full mx-auto">
         <div className="flex items-center justify-end gap-7">
           <span className="text-[9px] uppercase tracking-[0.2em] text-gray-500">powered by</span>
-          <img src={clouderaLogo} alt="Cloudera" className="h-4 opacity-60 hover:opacity-100 transition-opacity" />
-          <img src={vastLogo} alt="VAST Data" className="h-[15px] opacity-60 hover:opacity-100 transition-opacity" />
-          <img src={fundamentalLogo} alt="Fundamental (NEXUS)" className="h-[18px] opacity-60 hover:opacity-100 transition-opacity" />
+          <img src={clouderaLogo} alt="Cloudera" className="h-4 opacity-60 hover:opacity-100 transition-opacity invert" />
+          <img src={vastLogo} alt="VAST Data" className="h-[15px] opacity-60 hover:opacity-100 transition-opacity invert" />
+          <img src={fundamentalLogo} alt="Fundamental (NEXUS)" className="h-[18px] opacity-60 hover:opacity-100 transition-opacity invert" />
         </div>
       </footer>
 

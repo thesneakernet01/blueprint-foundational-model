@@ -51,12 +51,12 @@ export default function LifecycleStrip({ runs, registry, exportRunning }: Props)
       : state === 'active'
         ? 'border-accent/60 text-accent'
         : state === 'unavailable'
-          ? 'border-surface-4 text-gray-600 opacity-60'
+          ? 'border-surface-4 text-gray-400 opacity-60'
           : 'border-surface-4 text-gray-500';
 
   return (
     <div className="bg-surface-2 rounded-lg border border-surface-3 p-4">
-      <h3 className="text-sm font-medium text-gray-300 mb-3">Lifecycle on Cloudera AI</h3>
+      <h3 className="text-sm font-medium text-gray-700 mb-3">Lifecycle on Cloudera AI</h3>
       <div className="space-y-2">
         {stages.map((s) => (
           <div
@@ -79,7 +79,7 @@ export default function LifecycleStrip({ runs, registry, exportRunning }: Props)
         ))}
       </div>
       {registry != null && !registry.available && (
-        <p className="mt-2.5 text-[10px] text-gray-600 leading-snug">
+        <p className="mt-2.5 text-[10px] text-gray-400 leading-snug">
           Register &amp; Deploy light up when this app runs on Cloudera AI — {registry.reason}.
         </p>
       )}

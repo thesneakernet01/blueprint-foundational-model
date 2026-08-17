@@ -22,7 +22,7 @@ interface Props {
 const POLL_MS = 1500;
 
 const STATE_META: Record<ExportState, { label: string; cls: string }> = {
-  idle: { label: 'Idle', cls: 'bg-surface-4 text-gray-400' },
+  idle: { label: 'Idle', cls: 'bg-surface-4 text-gray-600' },
   running: { label: 'Running', cls: 'bg-accent/20 text-accent' },
   done: { label: 'Complete', cls: 'bg-status-green/20 text-status-green' },
   error: { label: 'Failed', cls: 'bg-status-red/20 text-status-red' },
@@ -150,7 +150,7 @@ export default function ExportDialog({ open, onClose, onExported }: Props) {
         {/* header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-surface-3">
           <div className="flex items-center gap-3">
-            <h2 className="text-base font-semibold text-white">Build artifacts</h2>
+            <h2 className="text-base font-semibold text-ink">Build artifacts</h2>
             <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${meta.cls}`}>{meta.label}</span>
             {status?.elapsed_sec != null && (
               <span className="font-mono text-[11px] text-gray-500">{status.elapsed_sec}s</span>
@@ -158,7 +158,7 @@ export default function ExportDialog({ open, onClose, onExported }: Props) {
           </div>
           <button
             onClick={onClose}
-            className="p-1 text-gray-500 hover:text-gray-300 rounded-lg hover:bg-surface-3"
+            className="p-1 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-surface-3"
           >
             <X className="w-4 h-4" />
           </button>
@@ -166,10 +166,10 @@ export default function ExportDialog({ open, onClose, onExported }: Props) {
 
         {/* body */}
         <div className="p-5 space-y-4 overflow-y-auto">
-          <p className="text-xs text-gray-400 leading-relaxed">
+          <p className="text-xs text-gray-600 leading-relaxed">
             Trains the XGBoost heads (plus the NEXUS Large Tabular Model head when
             configured), fits PCA + UMAP on the foundation-model
-            embeddings, and writes <span className="font-mono text-gray-300">demo_artifacts/</span> on
+            embeddings, and writes <span className="font-mono text-gray-700">demo_artifacts/</span> on
             the backend. Reads the training splits from the configured Impala database
             (see the Data dialog) and generates the foundation-model embeddings in-app —
             requires the model checkpoint, the Impala split tables, and a GPU. When it
@@ -181,7 +181,7 @@ export default function ExportDialog({ open, onClose, onExported }: Props) {
           {nexus && (
             <div className="bg-surface-2 border border-surface-3 rounded-lg p-3">
               <div className="flex items-center justify-between gap-3">
-                <div className="text-xs font-medium text-gray-300">
+                <div className="text-xs font-medium text-gray-700">
                   NEXUS head{' '}
                   <span className="text-gray-500 font-normal">· Large Tabular Model</span>
                 </div>
@@ -203,8 +203,8 @@ export default function ExportDialog({ open, onClose, onExported }: Props) {
                           active
                             ? 'bg-status-purple/20 text-status-purple'
                             : liveLocked
-                              ? 'text-gray-600 cursor-not-allowed'
-                              : 'text-gray-400 hover:text-gray-200 hover:bg-surface-3'
+                              ? 'text-gray-400 cursor-not-allowed'
+                              : 'text-gray-600 hover:text-gray-800 hover:bg-surface-3'
                         }`}
                       >
                         {m}
@@ -234,7 +234,7 @@ export default function ExportDialog({ open, onClose, onExported }: Props) {
           {status && status.log.length > 0 && (
             <div
               ref={logRef}
-              className="bg-surface-0 border border-surface-3 rounded-lg p-3 max-h-56 overflow-y-auto font-mono text-[11px] leading-relaxed text-gray-400 space-y-0.5"
+              className="bg-surface-0 border border-surface-3 rounded-lg p-3 max-h-56 overflow-y-auto font-mono text-[11px] leading-relaxed text-gray-600 space-y-0.5"
             >
               {status.log.map((line, i) => (
                 <div
@@ -293,7 +293,7 @@ export default function ExportDialog({ open, onClose, onExported }: Props) {
         <div className="px-5 py-4 border-t border-surface-3 flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="bg-surface-3 text-gray-300 hover:bg-surface-4 px-3 py-1.5 text-xs font-medium rounded-md transition-colors"
+            className="bg-surface-3 text-gray-700 hover:bg-surface-4 px-3 py-1.5 text-xs font-medium rounded-md transition-colors"
           >
             Close
           </button>
@@ -343,7 +343,7 @@ export function ResourceMonitor({ res, live }: { res: ResourceSample; live: bool
       <div className="flex items-center gap-2 mb-2.5 text-[10px] uppercase tracking-wide text-gray-500">
         <Activity className={`w-3 h-3 ${live ? 'text-accent' : ''}`} />
         Backend resources
-        {res.gpu_name && <span className="font-mono normal-case text-gray-400">· {res.gpu_name}</span>}
+        {res.gpu_name && <span className="font-mono normal-case text-gray-600">· {res.gpu_name}</span>}
       </div>
       <div className="grid grid-cols-2 gap-x-5 gap-y-2.5">
         {meters.map((m) => (
@@ -368,7 +368,7 @@ function Meter({ label, pct, detail }: { label: string; pct: number | null; deta
     <div>
       <div className="flex items-center justify-between mb-1 text-[10px]">
         <span className="text-gray-500 uppercase tracking-wide">{label}</span>
-        <span className="font-mono text-gray-400">
+        <span className="font-mono text-gray-600">
           {detail ?? (pct != null ? `${pct.toFixed(0)}%` : '—')}
         </span>
       </div>

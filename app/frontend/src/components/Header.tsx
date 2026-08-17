@@ -49,7 +49,7 @@ export default function Header({ status, error, view, onViewChange, onBuild, onD
           <ShieldAlert className="w-5 h-5 text-accent" />
         </div>
         <div>
-          <h1 className="text-lg font-semibold text-white leading-tight">
+          <h1 className="text-lg font-semibold text-ink leading-tight">
             Transaction Foundation Model
           </h1>
           <p className="text-xs text-gray-500">
@@ -66,7 +66,7 @@ export default function Header({ status, error, view, onViewChange, onBuild, onD
             className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
               view === key
                 ? 'bg-accent/15 text-accent'
-                : 'text-gray-400 hover:text-gray-200 hover:bg-surface-3'
+                : 'text-gray-600 hover:text-gray-800 hover:bg-surface-3'
             }`}
           >
             <Icon className="w-3.5 h-3.5" />
@@ -78,24 +78,24 @@ export default function Header({ status, error, view, onViewChange, onBuild, onD
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2 text-xs">
           <StatusDot tone={modeTone} />
-          <Activity className="w-3.5 h-3.5 text-gray-400" />
-          <span className="text-gray-400">{modeLabel}</span>
+          <Activity className="w-3.5 h-3.5 text-gray-600" />
+          <span className="text-gray-600">{modeLabel}</span>
         </div>
         <div className="flex items-center gap-2 text-xs">
           <StatusDot tone={status?.gpu ? 'green' : 'neutral'} />
-          <Cpu className="w-3.5 h-3.5 text-gray-400" />
-          <span className="text-gray-400">{status?.gpu ? 'CUDA ready' : 'no GPU'}</span>
+          <Cpu className="w-3.5 h-3.5 text-gray-600" />
+          <span className="text-gray-600">{status?.gpu ? 'CUDA ready' : 'no GPU'}</span>
         </div>
         <button
           onClick={onData}
-          className="flex items-center gap-1.5 bg-surface-3 text-gray-300 hover:bg-surface-4 px-3 py-1.5 text-xs font-medium rounded-md transition-colors"
+          className="flex items-center gap-1.5 bg-surface-3 text-gray-700 hover:bg-surface-4 px-3 py-1.5 text-xs font-medium rounded-md transition-colors"
         >
           <Database className="w-3.5 h-3.5" />
           Data
         </button>
         <button
           onClick={onBuild}
-          className="flex items-center gap-1.5 bg-surface-3 text-gray-300 hover:bg-surface-4 px-3 py-1.5 text-xs font-medium rounded-md transition-colors"
+          className="flex items-center gap-1.5 bg-surface-3 text-gray-700 hover:bg-surface-4 px-3 py-1.5 text-xs font-medium rounded-md transition-colors"
         >
           <Hammer className="w-3.5 h-3.5" />
           Build artifacts

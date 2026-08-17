@@ -46,7 +46,7 @@ export default function PipelineFlow({ status, lastRun, nexusOn }: Props) {
   return (
     <div className="bg-surface-2 rounded-lg border border-surface-3 p-4">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-medium text-gray-300">Training pipeline</h3>
+        <h3 className="text-sm font-medium text-gray-700">Training pipeline</h3>
         <span className="text-[11px] text-gray-500 font-mono">
           {running
             ? `running · ${fmtDuration(status?.elapsed_sec)}`
@@ -78,7 +78,7 @@ export default function PipelineFlow({ status, lastRun, nexusOn }: Props) {
                       ? 'bg-status-green/15 border-status-green/40 text-status-green'
                       : st === 'active'
                         ? 'bg-accent/15 border-accent text-accent animate-pulse-glow-accent'
-                        : 'bg-surface-3 border-surface-4 text-gray-600'
+                        : 'bg-surface-3 border-surface-4 text-gray-400'
                   }`}
                 >
                   {st === 'done' ? (
@@ -91,12 +91,12 @@ export default function PipelineFlow({ status, lastRun, nexusOn }: Props) {
                 </div>
                 <div
                   className={`mt-1.5 text-[10px] font-medium leading-tight ${
-                    st === 'pending' ? 'text-gray-600' : 'text-gray-300'
+                    st === 'pending' ? 'text-gray-400' : 'text-gray-700'
                   }`}
                 >
                   {s.label}
                 </div>
-                <div className="text-[9px] text-gray-600 font-mono leading-tight">{s.code}</div>
+                <div className="text-[9px] text-gray-400 font-mono leading-tight">{s.code}</div>
               </div>
             </div>
           );

@@ -93,10 +93,10 @@ export default function ParadigmCompare({ open, onClose, summary }: Props) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-surface-3">
-          <h2 className="text-base font-semibold text-white">Classic ML vs. foundation models</h2>
+          <h2 className="text-base font-semibold text-ink">Classic ML vs. foundation models</h2>
           <button
             onClick={onClose}
-            className="p-1 text-gray-500 hover:text-gray-300 rounded-lg hover:bg-surface-3"
+            className="p-1 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-surface-3"
           >
             <X className="w-4 h-4" />
           </button>
@@ -109,7 +109,7 @@ export default function ParadigmCompare({ open, onClose, summary }: Props) {
                 <tr>
                   <th className="w-36" />
                   <th className="text-left align-top px-3 pb-3 border-b-2 border-gray-500/60">
-                    <div className="text-gray-200 font-medium">Everything XGBoost</div>
+                    <div className="text-gray-800 font-medium">Everything XGBoost</div>
                     <div className="text-[10px] font-normal text-gray-500 mt-0.5">raw head · today's world</div>
                   </th>
                   <th className="text-left align-top px-3 pb-3 border-b-2 border-accent/60">
@@ -129,9 +129,9 @@ export default function ParadigmCompare({ open, onClose, summary }: Props) {
                 {rows.map(({ label, classic, hybrid, foundation }) => (
                   <tr key={label} className="border-b border-surface-3 last:border-0">
                     <td className="py-2.5 pr-2 text-gray-500 align-top">{label}</td>
-                    <td className="py-2.5 px-3 text-gray-300 align-top">{classic}</td>
-                    <td className="py-2.5 px-3 text-gray-300 align-top">{hybrid}</td>
-                    <td className={`py-2.5 px-3 align-top ${nexus ? 'text-gray-300' : 'text-gray-600'}`}>
+                    <td className="py-2.5 px-3 text-gray-700 align-top">{classic}</td>
+                    <td className="py-2.5 px-3 text-gray-700 align-top">{hybrid}</td>
+                    <td className={`py-2.5 px-3 align-top ${nexus ? 'text-gray-700' : 'text-gray-400'}`}>
                       {foundation}
                     </td>
                   </tr>

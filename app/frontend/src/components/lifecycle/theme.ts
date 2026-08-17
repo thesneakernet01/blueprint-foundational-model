@@ -1,18 +1,18 @@
 // Shared chart chrome for the Model Lifecycle dashboard (Cloudera brand
 // palette — keep in sync with tailwind.config.js). Recharts needs raw hexes.
 export const SERIES: Record<string, { color: string; label: string }> = {
-  raw: { color: '#A8AFB9', label: 'Raw tabular' },
+  raw: { color: '#6E7679', label: 'Raw tabular' },
   embed: { color: '#FF550C', label: 'FM embeddings' },
   combined: { color: '#5555F9', label: 'Combined' },
-  nexus: { color: '#8789FB', label: 'NEXUS LTM' },
+  nexus: { color: '#26177B', label: 'NEXUS LTM' },
 };
 
 export const CHART = {
   tick: { fill: '#6b7280', fontSize: 10 },
-  grid: '#332979',
+  grid: '#D9D9E8',
   tooltip: {
-    background: '#1B1157',
-    border: '1px solid #332979',
+    background: '#FFFFFF',
+    border: '1px solid #D9D9E8',
     borderRadius: '8px',
     fontSize: '12px',
   } as React.CSSProperties,

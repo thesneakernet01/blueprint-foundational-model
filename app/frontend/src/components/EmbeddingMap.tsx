@@ -23,7 +23,7 @@ function LiveDot(props: { cx?: number; cy?: number }) {
   return (
     <g>
       <circle cx={cx} cy={cy} r={11} fill="#FF550C" fillOpacity={0.15} />
-      <circle cx={cx} cy={cy} r={5} fill="#FF550C" stroke="#0A0328" strokeWidth={1.5} />
+      <circle cx={cx} cy={cy} r={5} fill="#FF550C" stroke="#FFFFFF" strokeWidth={1.5} />
     </g>
   );
 }
@@ -34,7 +34,7 @@ function ExpectedRing(props: { cx?: number; cy?: number }) {
   const { cx, cy } = props;
   if (cx == null || cy == null) return null;
   return (
-    <circle cx={cx} cy={cy} r={8} fill="none" stroke="#e5e7eb" strokeWidth={1.5} strokeDasharray="3 2.5" opacity={0.8} />
+    <circle cx={cx} cy={cy} r={8} fill="none" stroke="#6b7280" strokeWidth={1.5} strokeDasharray="3 2.5" opacity={0.8} />
   );
 }
 
@@ -86,7 +86,7 @@ export default function EmbeddingMap({ umap, result, expected }: Props) {
   return (
     <div className="bg-surface-2 rounded-lg border border-surface-3 p-4">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-medium text-gray-300">Embedding map</h2>
+        <h2 className="text-sm font-medium text-gray-700">Embedding map</h2>
         <span className="text-[10px] uppercase tracking-wider text-gray-500">UMAP · test set</span>
       </div>
 
@@ -94,8 +94,8 @@ export default function EmbeddingMap({ umap, result, expected }: Props) {
         {!hasData ? (
           <div className="h-full flex flex-col items-center justify-center text-gray-500">
             <MapIcon className="w-10 h-10 mb-3 opacity-30" />
-            <p className="text-gray-400 text-sm">No embedding background yet</p>
-            <p className="text-[11px] text-gray-600 mt-2">
+            <p className="text-gray-600 text-sm">No embedding background yet</p>
+            <p className="text-[11px] text-gray-400 mt-2">
               Available after export_for_demo.py runs on the GPU box.
             </p>
           </div>
@@ -136,14 +136,14 @@ export default function EmbeddingMap({ umap, result, expected }: Props) {
           <span className="flex items-center gap-1.5">
             <i
               className="w-2.5 h-2.5 rounded-full inline-block border border-dashed"
-              style={{ borderColor: '#e5e7eb' }}
+              style={{ borderColor: '#6b7280' }}
             />{' '}
             Expected (batch)
           </span>
         )}
       </div>
 
-      <p className="text-[10px] text-gray-600 mt-3 leading-relaxed">
+      <p className="text-[10px] text-gray-400 mt-3 leading-relaxed">
         512-d embeddings projected to 2-D. The decoder learns the geometry from raw sequences — fraud
         clusters emerge with no labels.
         {liveClamped && ' Live point landed beyond the background extent — pinned to the frame edge.'}

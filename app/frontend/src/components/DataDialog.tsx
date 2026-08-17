@@ -29,7 +29,7 @@ interface Props {
 const POLL_MS = 1500;
 
 const STATE_META: Record<ExportState, { label: string; cls: string }> = {
-  idle: { label: 'Idle', cls: 'bg-surface-4 text-gray-400' },
+  idle: { label: 'Idle', cls: 'bg-surface-4 text-gray-600' },
   running: { label: 'Loading data', cls: 'bg-accent/20 text-accent' },
   done: { label: 'Loaded', cls: 'bg-status-green/20 text-status-green' },
   error: { label: 'Failed', cls: 'bg-status-red/20 text-status-red' },
@@ -47,7 +47,7 @@ const BACKEND_META: Record<DataBackend, { label: string; hint: string }> = {
 };
 
 const FIELD_CLS =
-  'mt-1 w-full bg-surface-0 border border-surface-3 rounded-md px-3 py-1.5 text-sm font-mono text-gray-200 placeholder-gray-600 focus:outline-none focus:border-accent';
+  'mt-1 w-full bg-surface-0 border border-surface-3 rounded-md px-3 py-1.5 text-sm font-mono text-gray-800 placeholder-gray-400 focus:outline-none focus:border-accent';
 
 function Field({
   label,
@@ -229,7 +229,7 @@ export default function DataDialog({ open, onClose }: Props) {
         {/* header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-surface-3">
           <div className="flex items-center gap-3">
-            <h2 className="text-base font-semibold text-white">Training data · storage</h2>
+            <h2 className="text-base font-semibold text-ink">Training data · storage</h2>
             {state !== 'idle' && (
               <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${meta.cls}`}>
                 {meta.label}
@@ -241,7 +241,7 @@ export default function DataDialog({ open, onClose }: Props) {
           </div>
           <button
             onClick={onClose}
-            className="p-1 text-gray-500 hover:text-gray-300 rounded-lg hover:bg-surface-3"
+            className="p-1 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-surface-3"
           >
             <X className="w-4 h-4" />
           </button>
@@ -249,10 +249,10 @@ export default function DataDialog({ open, onClose }: Props) {
 
         {/* body */}
         <div className="p-5 space-y-4 overflow-y-auto">
-          <p className="text-xs text-gray-400 leading-relaxed">
-            The temporal training splits <span className="font-mono text-gray-300">train</span>,{' '}
-            <span className="font-mono text-gray-300">val_eval</span> and{' '}
-            <span className="font-mono text-gray-300">test_eval</span> live in the storage target
+          <p className="text-xs text-gray-600 leading-relaxed">
+            The temporal training splits <span className="font-mono text-gray-700">train</span>,{' '}
+            <span className="font-mono text-gray-700">val_eval</span> and{' '}
+            <span className="font-mono text-gray-700">test_eval</span> live in the storage target
             below. Load TabFormer into it — artifact builds (training) read the splits back from
             there.
           </p>
@@ -269,7 +269,7 @@ export default function DataDialog({ open, onClose }: Props) {
                 className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
                   backend === b
                     ? 'bg-accent/15 border-accent/60 text-accent'
-                    : 'bg-surface-0 border-surface-3 text-gray-400 hover:text-gray-200'
+                    : 'bg-surface-0 border-surface-3 text-gray-600 hover:text-gray-800'
                 }`}
               >
                 {b === 'vast' ? <HardDrive className="w-3.5 h-3.5" /> : <Database className="w-3.5 h-3.5" />}
@@ -333,7 +333,7 @@ export default function DataDialog({ open, onClose }: Props) {
           <button
             onClick={saveAndTest}
             disabled={testing || !configured}
-            className="flex items-center gap-2 bg-surface-3 text-gray-300 hover:bg-surface-4 px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 bg-surface-3 text-gray-700 hover:bg-surface-4 px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {testing ? (
               <>
@@ -377,7 +377,7 @@ export default function DataDialog({ open, onClose }: Props) {
                       <div key={table} className="flex flex-col gap-0.5">
                         <span className="text-gray-500 font-mono">{table}</span>
                         <span
-                          className={`font-mono ${rows ? 'text-gray-200' : 'text-status-amber'}`}
+                          className={`font-mono ${rows ? 'text-gray-800' : 'text-status-amber'}`}
                         >
                           {rows != null ? `${rows.toLocaleString()} rows` : 'missing'}
                         </span>
@@ -401,7 +401,7 @@ export default function DataDialog({ open, onClose }: Props) {
           {prep && prep.log.length > 0 && (
             <div
               ref={logRef}
-              className="bg-surface-0 border border-surface-3 rounded-lg p-3 max-h-56 overflow-y-auto font-mono text-[11px] leading-relaxed text-gray-400 space-y-0.5"
+              className="bg-surface-0 border border-surface-3 rounded-lg p-3 max-h-56 overflow-y-auto font-mono text-[11px] leading-relaxed text-gray-600 space-y-0.5"
             >
               {prep.log.map((line, i) => (
                 <div
@@ -442,7 +442,7 @@ export default function DataDialog({ open, onClose }: Props) {
           <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="bg-surface-3 text-gray-300 hover:bg-surface-4 px-3 py-1.5 text-xs font-medium rounded-md transition-colors"
+              className="bg-surface-3 text-gray-700 hover:bg-surface-4 px-3 py-1.5 text-xs font-medium rounded-md transition-colors"
             >
               Close
             </button>

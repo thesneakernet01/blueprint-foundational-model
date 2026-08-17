@@ -24,7 +24,7 @@ const HEADS: {
   fill: string;
   text: string;
 }[] = [
-  { key: 'raw', paradigm: 'classic', label: 'Raw features', fill: 'bg-gray-500', text: 'text-gray-200' },
+  { key: 'raw', paradigm: 'classic', label: 'Raw features', fill: 'bg-gray-500', text: 'text-gray-800' },
   { key: 'embed', paradigm: 'hybrid', label: 'Embeddings', fill: 'bg-accent', text: 'text-accent' },
   { key: 'combined', paradigm: 'hybrid', label: 'Combined', fill: 'bg-status-amber', text: 'text-status-amber' },
   { key: 'nexus', paradigm: 'foundation', label: 'Large Tabular Model', fill: 'bg-status-purple', text: 'text-status-purple' },
@@ -49,7 +49,7 @@ export default function ModelHeads({ result, summary, scoring, error }: Props) {
   return (
     <div className="bg-surface-2 rounded-lg border border-surface-3 p-4">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-medium text-gray-300">Model heads</h2>
+        <h2 className="text-sm font-medium text-gray-700">Model heads</h2>
         <span className="text-[10px] uppercase tracking-wider text-gray-500">
           {result && 'nexus' in result.scores
             ? 'raw · embeddings · combined · ltm'
@@ -68,7 +68,7 @@ export default function ModelHeads({ result, summary, scoring, error }: Props) {
                 className={`font-mono text-[11px] px-2 py-1 rounded border animate-fade-slide-in ${
                   special
                     ? 'bg-accent/10 border-accent/30 text-accent'
-                    : 'bg-surface-3 border-surface-4 text-gray-400'
+                    : 'bg-surface-3 border-surface-4 text-gray-600'
                 }`}
                 style={{ animationDelay: `${i * 45}ms` }}
               >
@@ -88,8 +88,8 @@ export default function ModelHeads({ result, summary, scoring, error }: Props) {
       {!result && !error && (
         <div className="text-center py-12 text-gray-500">
           <Cpu className="w-12 h-12 mx-auto mb-3 opacity-20" />
-          <p className="text-gray-400">Load an example or compose a transaction, then run inference.</p>
-          <p className="text-[11px] text-gray-600 mt-2">
+          <p className="text-gray-600">Load an example or compose a transaction, then run inference.</p>
+          <p className="text-[11px] text-gray-400 mt-2">
             Each score is a forward pass through the decoder checkpoint when the backend is in REAL mode.
           </p>
         </div>
@@ -113,8 +113,8 @@ export default function ModelHeads({ result, summary, scoring, error }: Props) {
                     return (
                       <div key={key}>
                         <div className="flex items-baseline justify-between mb-1.5">
-                          <span className="text-xs text-gray-300">{label}</span>
-                          <span className={`font-mono text-base font-medium ${pct == null ? 'text-gray-600' : text}`}>
+                          <span className="text-xs text-gray-700">{label}</span>
+                          <span className={`font-mono text-base font-medium ${pct == null ? 'text-gray-400' : text}`}>
                             {pct == null ? '—' : `${pct}%`}
                           </span>
                         </div>
@@ -124,7 +124,7 @@ export default function ModelHeads({ result, summary, scoring, error }: Props) {
                             style={{ width: `${pct ?? 0}%` }}
                           />
                         </div>
-                        <div className="text-[10px] font-mono text-gray-600 mt-1">{meta(key, summary, result)}</div>
+                        <div className="text-[10px] font-mono text-gray-400 mt-1">{meta(key, summary, result)}</div>
                       </div>
                     );
                   })}
@@ -160,8 +160,8 @@ function Verdict({ result, scoring }: { result: ScoreResp; scoring: boolean }) {
         {flagged ? <AlertTriangle className="w-3.5 h-3.5" /> : <CheckCircle className="w-3.5 h-3.5" />}
         {flagged ? 'FLAG · REVIEW' : 'CLEAR'}
       </span>
-      <p className="text-xs text-gray-400 leading-relaxed">
-        Combined head returns <span className="font-mono text-gray-200">{pct}%</span> fraud probability.{' '}
+      <p className="text-xs text-gray-600 leading-relaxed">
+        Combined head returns <span className="font-mono text-gray-800">{pct}%</span> fraud probability.{' '}
         {result.mode === 'real'
           ? `Embedding extracted live from the ${result.embedding_dim}-d decoder checkpoint.`
           : 'Synthetic score — run export_for_demo.py on the GPU box for live model output.'}

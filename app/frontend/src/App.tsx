@@ -88,6 +88,10 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-surface-0 flex flex-col">
+      {/* top brand rule — mirrors the fixed orange bar at the bottom so the
+          page is framed in Cloudera orange (accent as edge chrome, per the
+          deck; the header surface itself stays brand indigo) */}
+      <div className="h-2 w-full bg-gradient-to-r from-accent to-[#FE8756]" />
       <Header
         status={status}
         error={statusError}

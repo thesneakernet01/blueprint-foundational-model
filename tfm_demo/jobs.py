@@ -56,6 +56,10 @@ class JobManager:
         self.error: Optional[str] = None
         self.started_at: Optional[float] = None
         self.finished_at: Optional[float] = None
+        # Coarse pipeline stage ids for the UI's animated flow (set by the
+        # worker via _set_stage; export stages come from run_export's on_stage).
+        self.stage: Optional[str] = None
+        self.stages_done: List[str] = []
 
     def start(self) -> bool:
         """Kick off the job. Returns False if one is already running."""
@@ -68,6 +72,8 @@ class JobManager:
             self.error = None
             self.started_at = time.time()
             self.finished_at = None
+            self.stage = None
+            self.stages_done = []
         self._thread = threading.Thread(
             target=self._run, name=f"tfm-{self.name}", daemon=True)
         self._thread.start()
@@ -76,6 +82,11 @@ class JobManager:
     def _emit(self, msg: str) -> None:
         log.info("[%s] %s", self.name, msg)
         self.log.append(msg)
+
+    def _set_stage(self, stage: str) -> None:
+        if self.stage and self.stage not in self.stages_done:
+            self.stages_done.append(self.stage)
+        self.stage = stage
 
     def _work(self) -> Optional[Dict]:
         raise NotImplementedError
@@ -103,6 +114,8 @@ class JobManager:
             "summary": self.summary,
             "error": self.error,
             "elapsed_sec": elapsed,
+            "stage": self.stage,
+            "stages_done": list(self.stages_done),
             # Live CPU/RAM/GPU snapshot so the dialogs can show meters while
             # the job runs (the UI polls this endpoint anyway).
             "resources": sample_resources(),
@@ -118,16 +131,63 @@ class ExportManager(JobManager):
 
     def _work(self) -> Optional[Dict]:
         # Imported lazily — pulls in cudf/xgboost/torch only when an export runs.
+        from . import runs
         from .export import run_export
 
-        summary = run_export(progress=self._emit)
+        budget = runs.next_budget()
+        self._emit(f"Run #{runs.next_run_index()} budget: "
+                   f"{budget['embed_max']:,} rows/split · "
+                   f"{round(budget['xgb_scale'] * 100)}% boosting rounds")
+        summary = run_export(progress=self._emit, budget=budget,
+                             on_stage=self._set_stage)
+        self._set_stage("reload")
         self._emit("Reloading artifacts into the live engine ...")
         self.engine.warmup()
         self._emit(f"Engine reloaded — mode: {self.engine.mode}")
+        self._set_stage("done")
         return summary
 
     def status(self) -> Dict:
         return {**super().status(), "engine_mode": self.engine.mode}
+
+
+class RegistryManager(JobManager):
+    """Cloudera Model Registry register/deploy, as a background job.
+
+    Registration logs the trained head bundle to the workspace's MLflow-backed
+    registry; deploy builds and starts a CML Model endpoint — both take minutes
+    and stream progress like the export. All cmlapi/MLflow knowledge lives in
+    tfm_demo/registry.py; off-CML the API routes 503 before start() is called.
+    """
+
+    name = "registry"
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.action: Optional[str] = None      # register | deploy
+
+    def start_action(self, action: str) -> bool:
+        """start() with the action recorded for the status poll. The
+        check-then-start window is benign: JobManager.start() re-checks state
+        under the lock, so at worst a losing caller briefly relabels `action`
+        before its start() returns False and the route 409s."""
+        with self._lock:
+            if self.state == "running":
+                return False
+        self.action = action
+        return self.start()
+
+    def _work(self) -> Optional[Dict]:
+        from . import registry
+
+        if self.action == "deploy":
+            return registry.deploy_latest(progress=self._emit,
+                                          on_stage=self._set_stage)
+        return registry.register_latest(progress=self._emit,
+                                        on_stage=self._set_stage)
+
+    def status(self) -> Dict:
+        return {**super().status(), "action": self.action}
 
 
 class PrepManager(JobManager):

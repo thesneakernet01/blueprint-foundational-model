@@ -22,8 +22,8 @@ function LiveDot(props: { cx?: number; cy?: number }) {
   if (cx == null || cy == null) return null;
   return (
     <g>
-      <circle cx={cx} cy={cy} r={11} fill="#6366f1" fillOpacity={0.15} />
-      <circle cx={cx} cy={cy} r={5} fill="#6366f1" stroke="#0a0a0f" strokeWidth={1.5} />
+      <circle cx={cx} cy={cy} r={11} fill="#FF550C" fillOpacity={0.15} />
+      <circle cx={cx} cy={cy} r={5} fill="#FF550C" stroke="#0A0328" strokeWidth={1.5} />
     </g>
   );
 }
@@ -105,7 +105,7 @@ export default function EmbeddingMap({ umap, result, expected }: Props) {
               <XAxis type="number" dataKey="x" hide domain={domain?.x ?? ['dataMin', 'dataMax']} allowDataOverflow />
               <YAxis type="number" dataKey="y" hide domain={domain?.y ?? ['dataMin', 'dataMax']} allowDataOverflow />
               <ZAxis range={[16, 16]} />
-              <Scatter data={normal} fill="#3a6ea5" fillOpacity={0.45} isAnimationActive={false} />
+              <Scatter data={normal} fill="#5555F9" fillOpacity={0.45} isAnimationActive={false} />
               <Scatter data={fraud} fill="#ef4444" fillOpacity={0.75} isAnimationActive={false} />
               {expectedPts.length > 0 && (
                 <Scatter data={expectedPts} isAnimationActive={false} shape={<ExpectedRing />} />
@@ -120,7 +120,7 @@ export default function EmbeddingMap({ umap, result, expected }: Props) {
 
       <div className="flex items-center gap-4 mt-3 text-[11px] font-mono text-gray-500">
         <span className="flex items-center gap-1.5">
-          <i className="w-2 h-2 rounded-full inline-block" style={{ background: '#3a6ea5' }} /> Normal
+          <i className="w-2 h-2 rounded-full inline-block" style={{ background: '#5555F9' }} /> Normal
         </span>
         <span className="flex items-center gap-1.5">
           <i className="w-2 h-2 rounded-full inline-block" style={{ background: '#ef4444' }} /> Fraud
@@ -128,7 +128,7 @@ export default function EmbeddingMap({ umap, result, expected }: Props) {
         <span className="flex items-center gap-1.5">
           <i
             className="w-2 h-2 rounded-full inline-block"
-            style={{ background: '#6366f1', boxShadow: '0 0 8px #6366f1' }}
+            style={{ background: '#FF550C', boxShadow: '0 0 8px #FF550C' }}
           />{' '}
           This transaction
         </span>

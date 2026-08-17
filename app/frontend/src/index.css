@@ -1,4 +1,6 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+/* Brand typography from the Cloudera marketing deck: Plus Jakarta Sans for
+   text, JetBrains Mono kept for numerals/IDs (consistent across platforms). */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -12,12 +14,11 @@
 
 html,
 body {
-  background-color: #0a0a0f;
+  background-color: #0a0328; /* surface-0 */
 }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: #e5e7eb;
@@ -35,18 +36,18 @@ samp {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #12121a;
+  background: #110046; /* surface-1 */
 }
 ::-webkit-scrollbar-thumb {
-  background: #2e2e3a;
+  background: #332979; /* surface-4 */
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #4a4a5a;
+  background: #43389a;
 }
 * {
   scrollbar-width: thin;
-  scrollbar-color: #2e2e3a #12121a;
+  scrollbar-color: #332979 #110046;
 }
 
 @keyframes fadeSlideIn {
@@ -74,4 +75,42 @@ samp {
 }
 .animate-pulse-glow {
   animation: pulseGlow 2s ease-in-out infinite;
+}
+
+/* Orange variant for the active training-pipeline stage (fraud UI keeps the
+   red pulseGlow above). */
+@keyframes pulseGlowAccent {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 85, 12, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 12px 4px rgba(255, 85, 12, 0.18);
+  }
+}
+.animate-pulse-glow-accent {
+  animation: pulseGlowAccent 2s ease-in-out infinite;
+}
+
+/* Pipeline-flow connectors: a dotted line whose dots march toward the active
+   stage (Template-D animated-connector idiom from the design spec). */
+.connector {
+  background-image: radial-gradient(circle, #332979 1.5px, transparent 1.5px);
+  background-size: 10px 3px;
+  background-repeat: repeat-x;
+  background-position: 0 center;
+  height: 3px !important;
+}
+.connector-done {
+  background-image: radial-gradient(circle, rgba(16, 185, 129, 0.55) 1.5px, transparent 1.5px);
+}
+.connector-active {
+  background-image: radial-gradient(circle, #ff550c 1.5px, transparent 1.5px);
+  animation: dashFlow 0.7s linear infinite;
+}
+
+@keyframes dashFlow {
+  to {
+    background-position: 10px center;
+  }
 }

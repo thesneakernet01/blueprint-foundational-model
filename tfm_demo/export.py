@@ -43,18 +43,23 @@ EMBED_ROOT = DATA_DIR / "embeddings"
 
 def _embed_dir():
     """Embedding cache dir, keyed by the configured data target (Impala
-    database or VAST bucket/prefix). The cached sel/labels/embeddings are
-    row-POSITION-keyed, so a cache built against one target's tables must never
-    be reused against another's (prepare_data clears the current target's cache
-    on re-ingest for the same reason)."""
+    database or VAST bucket/prefix) AND the active per-split row budget. The
+    cached sel/labels/embeddings are row-POSITION-keyed, so a cache built
+    against one target's tables must never be reused against another's
+    (prepare_data clears the current target's cache on re-ingest for the same
+    reason); keying by budget keeps a 4k-row selection from being silently
+    reused when a later run is granted 12k rows — and lets a demo replay after
+    runs.reset() re-hit each tier's cache."""
     from . import storage
-    return EMBED_ROOT / storage.cache_key()
+    return EMBED_ROOT / storage.cache_key() / f"n{_ACTIVE_EMBED_MAX}"
 
 # Per-split row cap for in-app embedding generation, so the UI "Build artifacts"
 # button stays tractable (embedding the full multi-million-row dataset would take
 # hours). Override with $EMBED_MAX_PER_SPLIT; the cached path always uses the
-# rows that were embedded.
+# rows that were embedded. The progressive run budget (tfm_demo/runs.py) sets
+# _ACTIVE_EMBED_MAX per export, never above this ceiling.
 EMBED_MAX = int(os.environ.get("EMBED_MAX_PER_SPLIT", "20000"))
+_ACTIVE_EMBED_MAX = EMBED_MAX
 EMBED_BATCH = int(os.environ.get("EMBED_BATCH", "512"))
 
 # XGBoost params copied verbatim from notebook 05.
@@ -68,7 +73,15 @@ XGB_PARAMS_COMBINED = dict(n_estimators=512, max_depth=12, learning_rate=0.00305
                            colsample_bytree=0.768, min_child_weight=25.85, subsample=0.65,
                            reg_alpha=0.01, reg_lambda=0.0001, gamma=4.8, random_state=42)
 
+
+def _scaled(params: Dict, scale: float) -> Dict:
+    """A head's params with n_estimators scaled by the run budget (floor 60 so
+    early tiers still train something meaningful); everything else untouched."""
+    return {**params, "n_estimators": max(60, round(params["n_estimators"] * scale))}
+
+
 Progress = Optional[Callable[[str], None]]
+StageHook = Optional[Callable[[str], None]]
 
 
 # --------------------------------------------------------------------------- #
@@ -135,7 +148,7 @@ def _balanced_train_sel(train_df) -> np.ndarray:
     y = _labels(train_df)
     fraud_idx = np.nonzero(y == 1)[0]
     normal_idx = np.nonzero(y == 0)[0]
-    target = min(EMBED_MAX, len(train_df))
+    target = min(_ACTIVE_EMBED_MAX, len(train_df))
     np.random.seed(42)
     n_fraud = min(len(fraud_idx), int(target * 0.1))
     n_normal = min(len(normal_idx), target - n_fraud)
@@ -150,10 +163,10 @@ def _natural_sel(df, seed: int) -> np.ndarray:
 
     Returns positional indices into the cuDF RangeIndex (label == position)."""
     n = len(df)
-    if n <= EMBED_MAX:
+    if n <= _ACTIVE_EMBED_MAX:
         return np.arange(n)
     np.random.seed(seed)
-    return np.sort(np.random.choice(n, EMBED_MAX, replace=False))
+    return np.sort(np.random.choice(n, _ACTIVE_EMBED_MAX, replace=False))
 
 
 # --------------------------------------------------------------------------- #
@@ -296,12 +309,38 @@ def _process_split(name, pipeline_cls, inference, emit) -> Dict:
 # --------------------------------------------------------------------------- #
 # the export
 # --------------------------------------------------------------------------- #
-def run_export(progress: Progress = None) -> Dict:
-    """Generate embeddings, train the heads, fit PCA/UMAP, write artifacts."""
+def run_export(progress: Progress = None, budget: Optional[Dict] = None,
+               on_stage: StageHook = None) -> Dict:
+    """Generate embeddings, train the heads, fit PCA/UMAP, write artifacts.
+
+    `budget` is the progressive run budget from runs.next_budget() —
+    {tier, embed_max, xgb_scale}; omitted, the full budget is used. `on_stage`
+    receives coarse stage ids ("check", "embed", "pca", "train", "nexus",
+    "artifacts") so the UI's pipeline animation tracks real progress instead of
+    parsing log text. Every successful export appends a record to the run
+    history (tfm_demo/runs.py).
+    """
+    import time as _time
+
+    from . import runs
+
     emit = progress or (lambda _m: None)
+    stage = on_stage or (lambda _s: None)
+    t0 = _time.time()
+    started_at = runs.now_iso()
+
+    global _ACTIVE_EMBED_MAX
+    if budget is None:
+        budget = {"tier": len(runs.schedule()) - 1, "embed_max": EMBED_MAX,
+                  "xgb_scale": 1.0}
+    _ACTIVE_EMBED_MAX = min(int(budget["embed_max"]), EMBED_MAX)
+    xgb_scale = float(budget.get("xgb_scale", 1.0))
+    emit(f"Run budget: {_ACTIVE_EMBED_MAX:,} rows/split · "
+         f"{round(xgb_scale * 100)}% boosting rounds (tier {budget['tier'] + 1})")
 
     # Fail fast (before the GPU stack loads) if the splits aren't there.
     from . import storage
+    stage("check")
     emit(f"Checking training data ({storage.target()}) ...")
     ready, detail = storage.splits_ready()
     if not ready:
@@ -354,6 +393,7 @@ def run_export(progress: Progress = None) -> Dict:
 
     # ---- per split: load -> select -> embed -> free (peak = ONE split) ----
     # The model is loaded once, only if some split still needs embedding.
+    stage("embed")
     _embed_dir().mkdir(parents=True, exist_ok=True)
     pipeline_cls = inference = None
     if not _all_cached():
@@ -367,6 +407,7 @@ def run_export(progress: Progress = None) -> Dict:
     X_test_e, y_test, sel_te = parts["test"]["emb"], parts["test"]["y"], parts["test"]["sel"]
 
     # ---- PCA 512 -> 64 ----------------------------------------------------
+    stage("pca")
     emit(f"PCA {X_train_e.shape[1]}d -> {PCA_DIM}d ...")
     pca = PCA(n_components=PCA_DIM, random_state=42)
     Xtr_pca = pca.fit_transform(X_train_e)
@@ -400,11 +441,15 @@ def run_export(progress: Progress = None) -> Dict:
         emit(f"  {name}: AUC {auc:.4f} · AP {ap:.4f}")
         return clf, auc, ap
 
-    clf_raw, auc_raw, ap_raw = fit(XGB_PARAMS_RAW, Xtr_raw, Xva_raw, Xte_raw, "raw")
-    clf_emb, auc_emb, ap_emb = fit(XGB_PARAMS_EMBED, Xtr_pca, Xva_pca, Xte_pca, "embed")
+    stage("train")
+    params_by_head = {name: _scaled(p, xgb_scale) for name, p in
+                      (("raw", XGB_PARAMS_RAW), ("embed", XGB_PARAMS_EMBED),
+                       ("combined", XGB_PARAMS_COMBINED))}
+    clf_raw, auc_raw, ap_raw = fit(params_by_head["raw"], Xtr_raw, Xva_raw, Xte_raw, "raw")
+    clf_emb, auc_emb, ap_emb = fit(params_by_head["embed"], Xtr_pca, Xva_pca, Xte_pca, "embed")
     Xtr_c = np.hstack([Xtr_raw, Xtr_pca]); Xva_c = np.hstack([Xva_raw, Xva_pca])
     Xte_c = np.hstack([Xte_raw, Xte_pca])
-    clf_comb, auc_comb, ap_comb = fit(XGB_PARAMS_COMBINED, Xtr_c, Xva_c, Xte_c, "combined")
+    clf_comb, auc_comb, ap_comb = fit(params_by_head["combined"], Xtr_c, Xva_c, Xte_c, "combined")
 
     # ---- optional fourth head: NEXUS Large Tabular Model -------------------
     # Gets the UNTRANSFORMED raw frames (X_*_raw pandas, not the ordinal-
@@ -414,6 +459,7 @@ def run_export(progress: Progress = None) -> Dict:
     nexus_meta = None
     if nexus.configured():
         try:
+            stage("nexus")
             emit(f"Training NEXUS head ({nexus.mode()} mode) ...")
             nexus_meta = nexus.fit_head(X_train_raw, y_train, X_val_raw, y_val,
                                         X_test_raw, y_test, progress=emit)
@@ -428,6 +474,7 @@ def run_export(progress: Progress = None) -> Dict:
              "(set NEXUS_MODE=stub|live to enable).")
 
     # ---- UMAP (live projection + background scatter) ---------------------
+    stage("artifacts")
     umap_bg = []
     try:
         from cuml.manifold import UMAP as cumlUMAP
@@ -527,8 +574,23 @@ def run_export(progress: Progress = None) -> Dict:
         })
         summary["lift"]["nexus_auc_pct"] = lift(nexus_meta["test_auc"], auc_raw)
         summary["lift"]["nexus_ap_pct"] = lift(nexus_meta["test_ap"], ap_raw)
+    # ---- run history (Model Lifecycle dashboard) --------------------------
+    record = runs.append_run({
+        "started_at": started_at,
+        "finished_at": runs.now_iso(),
+        "duration_sec": runs.elapsed(t0),
+        "budget": {**budget, "embed_max": _ACTIVE_EMBED_MAX,
+                   "n_estimators": {k: p["n_estimators"]
+                                    for k, p in params_by_head.items()}},
+        "models": summary["models"],
+        "lift": summary["lift"],
+        "nexus": nexus_meta is not None,
+    })
+    summary["run"] = {"index": record["run"], "id": record["run_id"],
+                      "budget": record["budget"]}
     (OUT / "summary.json").write_text(json.dumps(summary, indent=2))
     emit(f"Done — artifacts written to {OUT}")
+    emit(f"Recorded run #{record['run']} in the run history")
     emit(f"Lift (AP): embed {summary['lift']['embed_ap_pct']}% · "
          f"combined {summary['lift']['combined_ap_pct']}%")
     return summary

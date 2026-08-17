@@ -25,6 +25,8 @@ data/embeddings/
 .impala_settings.json
 .data_settings.json
 .nexus_settings.json
+# run history for the Model Lifecycle dashboard (per-deployment state)
+.runs_history.json
 
 # Node / frontend build (frontend/ has its own .gitignore too)
 node_modules/

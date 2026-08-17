@@ -13,6 +13,8 @@ optional **NEXUS LTM** head. The implementation lives in the root packages (see
 | Inference engine (REAL + DEMO-FALLBACK modes) | `tfm_demo/engine.py` |
 | FastAPI app factory + /api routes | `tfm_demo/app.py` (entrypoint: root `app.py`) |
 | NEXUS LTM integration | `tfm_demo/nexus.py` ([design](../docs/nexus-ltm-design.md)) |
+| Run history + progressive training budget | `tfm_demo/runs.py` |
+| Model Registry + CML Model deploy | `tfm_demo/registry.py` (+ `tfm_demo/registry_predict.py` fallback) |
 | Checkpoint | `models/` (root, gitignored) |
 
 `notebooks/` and `inference/` *(add as needed)*.

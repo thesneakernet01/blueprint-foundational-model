@@ -111,7 +111,7 @@ export default function MetricsStrip({ summary }: Props) {
         ))}
       </div>
       {summary.placeholder && (
-        <p className="text-[11px] text-gray-600">
+        <p className="text-[11px] text-gray-500">
           {summary.note || 'Showing placeholder metrics — run export_for_demo.py on the GPU box for live numbers.'}
         </p>
       )}

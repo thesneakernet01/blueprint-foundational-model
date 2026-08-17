@@ -1,6 +1,7 @@
 # tests/ — data quality · AI eval
 
-No automated suite ships yet; this folder documents the harness.
+`unit/` is the automated suite — run it in Docker with `docker compose run --rm test`
+(pytest against `tfm_demo/runs.py` and the off-CML registry degradation).
 
 ## What verifies this accelerator today
 
@@ -14,5 +15,6 @@ No automated suite ships yet; this folder documents the harness.
 
 | Path | Contents |
 |------|----------|
+| `unit/` | Budget-schedule + run-history invariants; `/api/registry` off-CML behavior. |
 | `data-quality/` *(add as needed)* | Split-schema and row-count assertions on the prepared Parquet. |
 | `ai-eval/` *(add as needed)* | Golden transactions with expected score ranges per head; lift-regression bounds. |

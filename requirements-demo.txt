@@ -16,3 +16,8 @@ impyla>=0.19
 # CPU-only prepare job has it too).
 boto3>=1.34
 pyarrow>=14
+
+# Model Registry integration (tfm_demo/registry.py) deliberately has NO pins
+# here: cmlapi and mlflow ship preinstalled in CML runtimes, are imported
+# lazily, and off-CML the /api/registry surface degrades to available:false
+# with a reason instead of importing them.

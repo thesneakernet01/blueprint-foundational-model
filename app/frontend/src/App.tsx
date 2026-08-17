@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
-import Header from './components/Header';
+import Header, { type View } from './components/Header';
 import MetricsStrip from './components/MetricsStrip';
 import TransactionComposer, {
   DEFAULT_FORM,
@@ -17,6 +17,8 @@ import fundamentalLogo from './assets/partners/fundamental-white.png';
 // Recharts is heavy and only the embedding map needs it — load it in its own
 // chunk so the first paint (header / composer / heads) isn't blocked on it.
 const EmbeddingMap = lazy(() => import('./components/EmbeddingMap'));
+// Same deal for the Model Lifecycle dashboard (recharts trend charts).
+const LifecycleDashboard = lazy(() => import('./components/lifecycle/LifecycleDashboard'));
 import {
   getExamples,
   getStatus,
@@ -46,6 +48,7 @@ export default function App() {
   const [scoreError, setScoreError] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [dataOpen, setDataOpen] = useState(false);
+  const [view, setView] = useState<View>('inference');
 
   // Load (or reload) all dashboard data. Each call degrades on its own.
   const refresh = useCallback(() => {
@@ -88,43 +91,57 @@ export default function App() {
       <Header
         status={status}
         error={statusError}
+        view={view}
+        onViewChange={setView}
         onBuild={() => setExportOpen(true)}
         onData={() => setDataOpen(true)}
       />
 
       <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 space-y-6 max-w-[1400px] w-full mx-auto">
-        <MetricsStrip summary={summary} />
+        {view === 'inference' ? (
+          <>
+            <MetricsStrip summary={summary} />
 
-        <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr_400px] gap-6 items-start">
-          <TransactionComposer
-            form={form}
-            setForm={(f) => {
-              setForm(f);
-              setLoadedExample(null); // manual edit — no longer "the" example
-            }}
-            examples={examples}
-            onLoadExample={(ex) => {
-              setForm(exampleToForm(ex.txn));
-              setLoadedExample(ex);
-            }}
-            onRun={runInference}
-            scoring={scoring}
-          />
-          <ModelHeads result={result} summary={summary} scoring={scoring} error={scoreError} />
+            <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr_400px] gap-6 items-start">
+              <TransactionComposer
+                form={form}
+                setForm={(f) => {
+                  setForm(f);
+                  setLoadedExample(null); // manual edit — no longer "the" example
+                }}
+                examples={examples}
+                onLoadExample={(ex) => {
+                  setForm(exampleToForm(ex.txn));
+                  setLoadedExample(ex);
+                }}
+                onRun={runInference}
+                scoring={scoring}
+              />
+              <ModelHeads result={result} summary={summary} scoring={scoring} error={scoreError} />
+              <Suspense
+                fallback={
+                  <div className="bg-surface-2 rounded-lg border border-surface-3 p-4 h-[420px] animate-pulse" />
+                }
+              >
+                <EmbeddingMap umap={umap} result={result} expected={loadedExample?.expected_position ?? null} />
+              </Suspense>
+            </div>
+          </>
+        ) : (
           <Suspense
             fallback={
               <div className="bg-surface-2 rounded-lg border border-surface-3 p-4 h-[420px] animate-pulse" />
             }
           >
-            <EmbeddingMap umap={umap} result={result} expected={loadedExample?.expected_position ?? null} />
+            <LifecycleDashboard onBuild={() => setExportOpen(true)} />
           </Suspense>
-        </div>
+        )}
       </main>
 
       {/* partner strip — bottom right */}
       <footer className="px-4 sm:px-6 lg:px-8 pb-4 max-w-[1400px] w-full mx-auto">
         <div className="flex items-center justify-end gap-7">
-          <span className="text-[9px] uppercase tracking-[0.2em] text-gray-600">powered by</span>
+          <span className="text-[9px] uppercase tracking-[0.2em] text-gray-500">powered by</span>
           <img src={clouderaLogo} alt="Cloudera" className="h-4 opacity-60 hover:opacity-100 transition-opacity" />
           <img src={vastLogo} alt="VAST Data" className="h-[15px] opacity-60 hover:opacity-100 transition-opacity" />
           <img src={fundamentalLogo} alt="Fundamental (NEXUS)" className="h-[18px] opacity-60 hover:opacity-100 transition-opacity" />

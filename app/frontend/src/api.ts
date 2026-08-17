@@ -144,6 +144,10 @@ export interface ExportStatus {
   elapsed_sec: number | null;
   engine_mode: Mode;
   resources?: ResourceSample | null;
+  /** Current pipeline stage id (check|embed|pca|train|nexus|artifacts|reload|done)
+   *  and the stages already completed — drives the animated pipeline flow. */
+  stage?: string | null;
+  stages_done?: string[];
 }
 
 /** Kick off an export. `started` is false (HTTP 409) if one is already running. */
@@ -156,6 +160,106 @@ export async function startExport(): Promise<{ started: boolean } & ExportStatus
 }
 
 export const getExportStatus = () => getJSON<ExportStatus>('/api/export/status');
+
+// ---- run history + Model Registry (Model Lifecycle dashboard) ---------------
+
+/** The progressive training budget a run was (or will be) granted. */
+export interface RunBudget {
+  tier: number;
+  embed_max: number;
+  xgb_scale: number;
+  /** Per-head boosting rounds actually used (recorded runs only). */
+  n_estimators?: Record<string, number>;
+}
+
+export interface RunRegistry {
+  registered: boolean;
+  model_version: number | null;
+  version_id: string | null;
+  registered_at: string | null;
+  deployed: boolean;
+  deployed_at: string | null;
+}
+
+export interface RunRecord {
+  run: number;
+  run_id: string;
+  started_at: string;
+  finished_at: string;
+  duration_sec: number;
+  budget: RunBudget;
+  models: ModelSummary[];
+  lift: Lift;
+  nexus: boolean;
+  registry: RunRegistry;
+}
+
+export interface RunsResp {
+  runs: RunRecord[];
+  next_budget: RunBudget;
+  schedule: RunBudget[];
+}
+
+export const getRuns = () => getJSON<RunsResp>('/api/runs');
+
+/** Clear the run history so the demo replays from tier 0. */
+export async function postRunsReset(): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/runs/reset`, { method: 'POST' });
+  if (!res.ok) throw new Error(`/api/runs/reset → ${res.status} ${res.statusText}`);
+}
+
+export interface RegistryVersion {
+  version: number | null;
+  version_id: string | null;
+  created_at: string;
+}
+
+/** The register/deploy background job (same shape as the export job). */
+export interface RegistryJob {
+  state: ExportState;
+  action: 'register' | 'deploy' | null;
+  log: string[];
+  error: string | null;
+  elapsed_sec: number | null;
+  stage?: string | null;
+  stages_done?: string[];
+}
+
+export interface RegistryStatus {
+  available: boolean;
+  /** Why the registry is unavailable (off-CML, no APIv2 key, …). */
+  reason: string | null;
+  model_name: string;
+  artifacts_ready: boolean;
+  artifacts_reason: string | null;
+  versions: RegistryVersion[];
+  model: { id: string; name: string } | null;
+  deployment: {
+    build_status: string | null;
+    status: string | null;
+    url: string | null;
+  } | null;
+  job: RegistryJob;
+}
+
+export const getRegistryStatus = () => getJSON<RegistryStatus>('/api/registry');
+
+async function postRegistryAction(path: string): Promise<{ started: boolean }> {
+  const res = await fetch(`${API_BASE}${path}`, { method: 'POST' });
+  const body = await res.json().catch(() => null);
+  if (res.status === 503 || res.status === 409) {
+    throw new Error(body?.error ?? `${path} → ${res.status}`);
+  }
+  if (res.status !== 202) {
+    throw new Error(`${path} → ${res.status} ${res.statusText}`);
+  }
+  return body;
+}
+
+/** Register the latest exported bundle as a new Model Registry version. */
+export const postRegister = () => postRegistryAction('/api/registry/register');
+/** Build + deploy the newest registered version as a CML Model endpoint. */
+export const postDeploy = () => postRegistryAction('/api/registry/deploy');
 
 // ---- NEXUS head mode (fourth model card) ------------------------------------
 

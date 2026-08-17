@@ -26,6 +26,15 @@ transaction data — not a production fraud decision system.
 - Live AUC / average-precision per head in the UI; UMAP for qualitative separation.
 - DEMO-FALLBACK mode substitutes deterministic outputs — clearly not a model evaluation.
 
+## Registry & serving
+
+- The combined head + preprocessor + PCA are registered as `tfm-fraud-combined`
+  in the Cloudera Model Registry, one version per training run (UI-triggered from
+  the Model Lifecycle dashboard; `tfm_demo/registry.py`).
+- Scope: the registered bundle scores rows that already carry the 64 PCA embedding
+  components — the TFM embedding stage runs upstream (needs the checkpoint + GPU)
+  and is not part of the registered asset.
+
 ## Limitations & risks
 
 - Lift measured on demo data — not evidence of production lift on an issuer's portfolio.

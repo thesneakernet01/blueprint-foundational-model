@@ -20,10 +20,10 @@ faulthandler.enable(file=sys.stderr, all_threads=True)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from . import nexus
+from . import nexus, registry, runs
 from .config import MODEL_DIR, cors_origins
 from .engine import Engine
-from .jobs import ExportManager, PrepManager
+from .jobs import ExportManager, PrepManager, RegistryManager
 from .schemas import DataConfig, NexusConfig, Txn
 from .settings import get_data_settings, save_data_settings
 
@@ -33,6 +33,8 @@ engine = Engine()
 exporter = ExportManager(engine)
 # Background TabFormer -> storage data load (subprocess wrapper).
 preparer = PrepManager()
+# Background Model Registry register/deploy runner (no-ops off-CML).
+registrar = RegistryManager()
 
 
 @asynccontextmanager
@@ -95,6 +97,54 @@ def create_app() -> FastAPI:
     @app.get("/api/export/status")
     def export_status() -> JSONResponse:
         return JSONResponse(exporter.status())
+
+    # ---- run history + Model Registry (Model Lifecycle dashboard) ----------
+    @app.get("/api/runs")
+    def run_history() -> JSONResponse:
+        """Recorded training runs plus the budget the NEXT run will be granted
+        (the progressive-improvement schedule in tfm_demo/runs.py)."""
+        return JSONResponse({
+            "runs": runs.history(),
+            "next_budget": runs.next_budget(),
+            "schedule": runs.schedule(),
+        })
+
+    @app.post("/api/runs/reset")
+    def run_history_reset() -> JSONResponse:
+        """Clear the run history so the demo replays from tier 0. The current
+        demo_artifacts keep serving until the next export overwrites them."""
+        runs.reset()
+        return JSONResponse({"ok": True, "runs": []})
+
+    @app.get("/api/registry")
+    def registry_status() -> JSONResponse:
+        """Registry availability (+why not, off-CML), registered versions, CML
+        Model deployment state, and the register/deploy job status."""
+        return JSONResponse({**registry.status(), "job": registrar.status()})
+
+    def _start_registry(action: str) -> JSONResponse:
+        ok, reason = registry.available()
+        if not ok:
+            return JSONResponse({"error": f"Model Registry unavailable: {reason}"},
+                                status_code=503)
+        started = registrar.start_action(action)
+        return JSONResponse({"started": started, **registrar.status()},
+                            status_code=202 if started else 409)
+
+    @app.post("/api/registry/register")
+    def registry_register() -> JSONResponse:
+        """Register the latest exported bundle as a new Model Registry version.
+        Returns immediately; poll /api/registry. 409 if a job is running."""
+        ready, art_reason = registry.artifacts_ready()
+        if not ready:
+            return JSONResponse({"error": art_reason}, status_code=409)
+        return _start_registry("register")
+
+    @app.post("/api/registry/deploy")
+    def registry_deploy() -> JSONResponse:
+        """Build + deploy the newest registered version as a CML Model
+        endpoint. Returns immediately; poll /api/registry."""
+        return _start_registry("deploy")
 
     # ---- data target (settings come from the UI's Data dialog) -------------
     def _masked_settings() -> dict:
@@ -162,7 +212,8 @@ def create_app() -> FastAPI:
             "mode": engine.mode,
             "gpu": engine.gpu,
             "endpoints": ["/api/status", "/api/summary", "/api/examples",
-                          "/api/umap", "/api/score", "/api/data"],
+                          "/api/umap", "/api/score", "/api/data",
+                          "/api/runs", "/api/registry"],
         })
 
     return app

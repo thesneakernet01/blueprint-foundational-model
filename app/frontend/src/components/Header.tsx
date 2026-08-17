@@ -1,9 +1,13 @@
-import { Activity, Cpu, Database, Hammer, ShieldAlert } from 'lucide-react';
+import { Activity, Cpu, Database, GitBranch, Hammer, ShieldAlert, Zap } from 'lucide-react';
 import type { StatusResp } from '../api';
+
+export type View = 'inference' | 'lifecycle';
 
 interface Props {
   status: StatusResp | null;
   error: boolean;
+  view: View;
+  onViewChange: (v: View) => void;
   onBuild: () => void;
   onData: () => void;
 }
@@ -18,7 +22,12 @@ function StatusDot({ tone }: { tone: 'green' | 'amber' | 'neutral' }) {
   return <span className={`w-2 h-2 rounded-full ${cls}`} />;
 }
 
-export default function Header({ status, error, onBuild, onData }: Props) {
+const VIEWS: { key: View; label: string; icon: typeof Zap }[] = [
+  { key: 'inference', label: 'Inference', icon: Zap },
+  { key: 'lifecycle', label: 'Model Lifecycle', icon: GitBranch },
+];
+
+export default function Header({ status, error, view, onViewChange, onBuild, onData }: Props) {
   const real = status?.mode === 'real';
   const modeLabel = error
     ? 'backend offline'
@@ -47,6 +56,23 @@ export default function Header({ status, error, onBuild, onData }: Props) {
             Live Fraud Inference · NeMo AutoModel + RAPIDS
           </p>
         </div>
+      </div>
+
+      <div className="flex items-center gap-1 bg-surface-2 border border-surface-3 rounded-lg p-0.5">
+        {VIEWS.map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            onClick={() => onViewChange(key)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+              view === key
+                ? 'bg-accent/15 text-accent'
+                : 'text-gray-400 hover:text-gray-200 hover:bg-surface-3'
+            }`}
+          >
+            <Icon className="w-3.5 h-3.5" />
+            {label}
+          </button>
+        ))}
       </div>
 
       <div className="flex items-center gap-4">

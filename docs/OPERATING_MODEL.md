@@ -155,6 +155,7 @@ Each accelerator deploys onto the **running platform** through native service AP
 | **Process** | Model + blueprint code staging | `pipelines/fetch_model.py` (AMP job) |
 | **AI** | TFM embeddings → XGBoost heads → live scoring | `src/` (tokenizer, decoder) · `tfm_demo/engine.py` · GPU runtime |
 | **Serve** | The inference cockpit Application | `app/serve_app.py` (uvicorn behind Vite preview on `CDSW_APP_PORT`) |
+| **Registry** | Model versioning + endpoint deploy (UI-triggered) | `tfm_demo/registry.py` (MLflow-backed Model Registry + cmlapi APIv2; run history in `tfm_demo/runs.py`) |
 | **Governance** | Model cards | [`../governance/`](../governance/) |
 
 ---

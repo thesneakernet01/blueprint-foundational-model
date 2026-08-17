@@ -50,6 +50,11 @@ environment_variables:
       single-application deployment — the SPA calls same-origin /api/* and Vite
       proxies it to the backend. Only set this (to an absolute URL) if pointing
       the UI at a separately-hosted backend.
+
+  # NOTE (no variable to set): the Model Lifecycle dashboard's Register/Deploy
+  # buttons use the workload-injected APIv2 key (CDSW_APIV2_KEY) via cmlapi.
+  # Current CML injects it into Applications by default; if a workspace does
+  # not, the registry panel self-disables and shows the reason — no failure.
     required: false
   IMPALA_CONNECTION_NAME:
     default: ""

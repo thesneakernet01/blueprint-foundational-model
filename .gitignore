@@ -28,13 +28,13 @@ data/embeddings/
 # run history for the Model Lifecycle dashboard (per-deployment state)
 .runs_history.json
 
-# Node / frontend build (frontend/ has its own .gitignore too)
+# Node / frontend build
 node_modules/
 dist/
 # ...but the SPA bundle IS the deployment artifact: CML runtimes ship no Node,
-# so frontend/dist must be prebuilt and committed (see scripts/serve_frontend.py).
-!frontend/dist/
-!frontend/dist/**
+# so app/frontend/dist must be prebuilt and committed (see app/serve_app.py).
+!app/frontend/dist/
+!app/frontend/dist/**
 
 # Env / secrets
 .env

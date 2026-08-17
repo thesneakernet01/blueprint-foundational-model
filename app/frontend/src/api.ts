@@ -181,6 +181,22 @@ export interface RunRegistry {
   deployed_at: string | null;
 }
 
+/** Per-round validation AUC — the gradient-boosting "loss curve". */
+export interface EvalCurve {
+  rounds: number[];
+  auc: number[];
+  /** 1-based round where early stopping kept the model. */
+  best_round: number;
+}
+
+/** Small per-run training diagnostics recorded by the export. */
+export interface RunDiagnostics {
+  eval_curves?: Record<string, EvalCurve>;
+  /** Test-set score histograms for the combined head. */
+  separation?: { edges: number[]; legit: number[]; fraud: number[] };
+  importance?: { name: string; importance: number; kind: 'raw' | 'embedding' }[];
+}
+
 export interface RunRecord {
   run: number;
   run_id: string;
@@ -192,6 +208,8 @@ export interface RunRecord {
   lift: Lift;
   nexus: boolean;
   registry: RunRegistry;
+  /** Absent on runs recorded before diagnostics existed. */
+  diagnostics?: RunDiagnostics;
 }
 
 export interface RunsResp {

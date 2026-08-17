@@ -16,6 +16,7 @@ import MetricTrend from './MetricTrend';
 import BudgetChart from './BudgetChart';
 import RunsTable from './RunsTable';
 import RegistryPanel from './RegistryPanel';
+import { EvalCurvePanel, SeparationPanel, ImportancePanel } from './RunDiagnostics';
 import { fmtRows } from './theme';
 
 interface Props {
@@ -159,7 +160,14 @@ export default function LifecycleDashboard({ onBuild }: Props) {
         <BudgetChart runs={runs} schedule={runsResp?.schedule ?? []} />
       </div>
 
-      {/* row 3: registry + run table */}
+      {/* row 3: latest-run training diagnostics */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <EvalCurvePanel lastRun={lastRun} />
+        <SeparationPanel lastRun={lastRun} />
+        <ImportancePanel lastRun={lastRun} />
+      </div>
+
+      {/* row 4: registry + run table */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         <RegistryPanel
           registry={registry}

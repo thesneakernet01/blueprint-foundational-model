@@ -431,6 +431,19 @@ def run_export(progress: Progress = None, budget: Optional[Dict] = None,
     n_raw = Xtr_raw.shape[1]
 
     # ---- train the three heads -------------------------------------------
+    def _eval_curve(clf, max_pts=100):
+        """Per-round validation AUC from evals_result(), downsampled — the
+        gradient-boosting 'loss curve'. Shows early stopping doing its job."""
+        vals = clf.evals_result().get("validation_0", {}).get("auc", [])
+        if not vals:
+            return None
+        idx = np.unique(np.linspace(0, len(vals) - 1,
+                                    min(max_pts, len(vals))).astype(int))
+        best = getattr(clf, "best_iteration", None)
+        return {"rounds": [int(i + 1) for i in idx],
+                "auc": [round(float(vals[i]), 5) for i in idx],
+                "best_round": int(best + 1) if best is not None else len(vals)}
+
     def fit(params, Xt, Xv, Xte, name):
         emit(f"Training {name} head ...")
         clf = xgb.XGBClassifier(**params, tree_method="hist", device=xgb_device,
@@ -439,17 +452,42 @@ def run_export(progress: Progress = None, budget: Optional[Dict] = None,
         pt = clf.predict_proba(Xte)[:, 1]
         auc, ap = roc_auc_score(y_test, pt), average_precision_score(y_test, pt)
         emit(f"  {name}: AUC {auc:.4f} · AP {ap:.4f}")
-        return clf, auc, ap
+        return clf, auc, ap, pt
 
     stage("train")
     params_by_head = {name: _scaled(p, xgb_scale) for name, p in
                       (("raw", XGB_PARAMS_RAW), ("embed", XGB_PARAMS_EMBED),
                        ("combined", XGB_PARAMS_COMBINED))}
-    clf_raw, auc_raw, ap_raw = fit(params_by_head["raw"], Xtr_raw, Xva_raw, Xte_raw, "raw")
-    clf_emb, auc_emb, ap_emb = fit(params_by_head["embed"], Xtr_pca, Xva_pca, Xte_pca, "embed")
+    clf_raw, auc_raw, ap_raw, _pt_raw = fit(params_by_head["raw"], Xtr_raw, Xva_raw, Xte_raw, "raw")
+    clf_emb, auc_emb, ap_emb, _pt_emb = fit(params_by_head["embed"], Xtr_pca, Xva_pca, Xte_pca, "embed")
     Xtr_c = np.hstack([Xtr_raw, Xtr_pca]); Xva_c = np.hstack([Xva_raw, Xva_pca])
     Xte_c = np.hstack([Xte_raw, Xte_pca])
-    clf_comb, auc_comb, ap_comb = fit(params_by_head["combined"], Xtr_c, Xva_c, Xte_c, "combined")
+    clf_comb, auc_comb, ap_comb, pt_comb = fit(params_by_head["combined"], Xtr_c, Xva_c, Xte_c, "combined")
+
+    # ---- per-run diagnostics for the lifecycle dashboard ------------------
+    # Small, JSON-safe summaries recorded with each run: the per-round
+    # validation curves, the test-set score separation of the combined head,
+    # and its top feature importances (raw columns vs embedding components).
+    curves = {"raw": _eval_curve(clf_raw), "embed": _eval_curve(clf_emb),
+              "combined": _eval_curve(clf_comb)}
+    edges = np.linspace(0.0, 1.0, 31)
+    separation = {
+        "edges": [round(float(e), 3) for e in edges],
+        "legit": [int(v) for v in np.histogram(pt_comb[y_test == 0], bins=edges)[0]],
+        "fraud": [int(v) for v in np.histogram(pt_comb[y_test == 1], bins=edges)[0]],
+    }
+    try:
+        raw_names = [n.split("__", 1)[-1] for n in preproc.get_feature_names_out()]
+    except Exception:                                              # noqa: BLE001
+        raw_names = [f"raw_{i}" for i in range(n_raw)]
+    feat_names = list(raw_names) + [f"pca_{i}" for i in range(Xtr_pca.shape[1])]
+    imp = np.asarray(clf_comb.feature_importances_, dtype=float)
+    importance = [{"name": feat_names[i] if i < len(feat_names) else f"f{i}",
+                   "importance": round(float(imp[i]), 5),
+                   "kind": "raw" if i < n_raw else "embedding"}
+                  for i in np.argsort(imp)[::-1][:15]]
+    diagnostics = {"eval_curves": {k: v for k, v in curves.items() if v},
+                   "separation": separation, "importance": importance}
 
     # ---- optional fourth head: NEXUS Large Tabular Model -------------------
     # Gets the UNTRANSFORMED raw frames (X_*_raw pandas, not the ordinal-
@@ -585,6 +623,7 @@ def run_export(progress: Progress = None, budget: Optional[Dict] = None,
         "models": summary["models"],
         "lift": summary["lift"],
         "nexus": nexus_meta is not None,
+        "diagnostics": diagnostics,
     })
     summary["run"] = {"index": record["run"], "id": record["run_id"],
                       "budget": record["budget"]}

@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#5f6b7a"/>
+    </marker>
+    <marker id="arrowO" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#f96702"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="960" height="540" fill="#fafbfc"/>
+  <text x="480" y="34" text-anchor="middle" font-size="20" font-weight="700" fill="#232f3e">Transaction Foundation Model — Live Fraud Inference</text>
+
+  <!-- Sources -->
+  <rect x="24" y="70" width="180" height="62" rx="10" fill="#ffffff" stroke="#c3ccd6" stroke-width="1.5"/>
+  <text x="114" y="96" text-anchor="middle" font-size="14" font-weight="600" fill="#232f3e">IBM TabFormer</text>
+  <text x="114" y="116" text-anchor="middle" font-size="13" fill="#5f6b7a">card transactions (~2.4 GB)</text>
+
+  <rect x="24" y="152" width="180" height="62" rx="10" fill="#ffffff" stroke="#c3ccd6" stroke-width="1.5"/>
+  <text x="114" y="178" text-anchor="middle" font-size="14" font-weight="600" fill="#232f3e">NVIDIA TFM repo</text>
+  <text x="114" y="198" text-anchor="middle" font-size="13" fill="#5f6b7a">decoder checkpoint + src/</text>
+
+  <!-- Pipelines -->
+  <rect x="252" y="70" width="184" height="62" rx="10" fill="#eef3f8" stroke="#8aa2b8" stroke-width="1.5"/>
+  <text x="344" y="96" text-anchor="middle" font-size="14" font-weight="600" fill="#232f3e">prepare_data.py</text>
+  <text x="344" y="116" text-anchor="middle" font-size="13" fill="#5f6b7a">temporal train/val/test split</text>
+
+  <rect x="252" y="152" width="184" height="62" rx="10" fill="#eef3f8" stroke="#8aa2b8" stroke-width="1.5"/>
+  <text x="344" y="178" text-anchor="middle" font-size="14" font-weight="600" fill="#232f3e">fetch_model.py</text>
+  <text x="344" y="198" text-anchor="middle" font-size="13" fill="#5f6b7a">checkpoint → models/</text>
+
+  <line x1="204" y1="101" x2="248" y2="101" stroke="#5f6b7a" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <line x1="204" y1="183" x2="248" y2="183" stroke="#5f6b7a" stroke-width="1.8" marker-end="url(#arrow)"/>
+
+  <!-- Data layer -->
+  <rect x="484" y="62" width="452" height="80" rx="12" fill="#ffffff" stroke="#8aa2b8" stroke-width="1.5"/>
+  <text x="710" y="86" text-anchor="middle" font-size="14" font-weight="700" fill="#232f3e">Lakehouse data layer</text>
+  <rect x="500" y="98" width="200" height="34" rx="8" fill="#eef3f8" stroke="#8aa2b8"/>
+  <text x="600" y="120" text-anchor="middle" font-size="13" fill="#232f3e">Impala tables (splits)</text>
+  <rect x="720" y="98" width="200" height="34" rx="8" fill="#eef3f8" stroke="#8aa2b8"/>
+  <text x="820" y="120" text-anchor="middle" font-size="13" fill="#232f3e">VAST S3 (Parquet)</text>
+  <line x1="436" y1="101" x2="480" y2="101" stroke="#5f6b7a" stroke-width="1.8" marker-end="url(#arrow)"/>
+
+  <!-- Cloudera AI container -->
+  <rect x="24" y="248" width="912" height="268" rx="14" fill="#ffffff" stroke="#f96702" stroke-width="2"/>
+  <text x="44" y="276" font-size="15" font-weight="700" fill="#f96702">Cloudera AI — single GPU application container (AMP)</text>
+
+  <!-- Engine group -->
+  <rect x="44" y="292" width="612" height="130" rx="10" fill="#fdf3ec" stroke="#e0b394" stroke-width="1.5"/>
+  <text x="350" y="314" text-anchor="middle" font-size="14" font-weight="600" fill="#232f3e">Inference engine (tfm_demo + src, RAPIDS / torch)</text>
+
+  <rect x="58" y="330" width="128" height="52" rx="8" fill="#ffffff" stroke="#c3ccd6" stroke-width="1.5"/>
+  <text x="122" y="352" text-anchor="middle" font-size="13" font-weight="600" fill="#232f3e">GPU tokenizer</text>
+  <text x="122" y="370" text-anchor="middle" font-size="13" fill="#5f6b7a">cuDF</text>
+
+  <rect x="210" y="330" width="140" height="52" rx="8" fill="#ffffff" stroke="#c3ccd6" stroke-width="1.5"/>
+  <text x="280" y="352" text-anchor="middle" font-size="13" font-weight="600" fill="#232f3e">TFM decoder</text>
+  <text x="280" y="370" text-anchor="middle" font-size="13" fill="#5f6b7a">512-d embedding</text>
+
+  <rect x="374" y="330" width="96" height="52" rx="8" fill="#ffffff" stroke="#c3ccd6" stroke-width="1.5"/>
+  <text x="422" y="360" text-anchor="middle" font-size="13" font-weight="600" fill="#232f3e">PCA-64</text>
+
+  <rect x="494" y="330" width="148" height="52" rx="8" fill="#ffffff" stroke="#c3ccd6" stroke-width="1.5"/>
+  <text x="568" y="352" text-anchor="middle" font-size="13" font-weight="600" fill="#232f3e">3 XGBoost heads</text>
+  <text x="568" y="370" text-anchor="middle" font-size="13" fill="#5f6b7a">raw · embed · combined</text>
+
+  <line x1="186" y1="356" x2="206" y2="356" stroke="#f96702" stroke-width="1.8" marker-end="url(#arrowO)"/>
+  <line x1="350" y1="356" x2="370" y2="356" stroke="#f96702" stroke-width="1.8" marker-end="url(#arrowO)"/>
+  <line x1="470" y1="356" x2="490" y2="356" stroke="#f96702" stroke-width="1.8" marker-end="url(#arrowO)"/>
+
+  <text x="350" y="408" text-anchor="middle" font-size="13" fill="#5f6b7a">in-app training/export · AUC/AP lift · UMAP · optional NEXUS LTM head</text>
+
+  <!-- Backend + SPA -->
+  <rect x="692" y="292" width="224" height="60" rx="10" fill="#eef3f8" stroke="#8aa2b8" stroke-width="1.5"/>
+  <text x="804" y="316" text-anchor="middle" font-size="14" font-weight="600" fill="#232f3e">FastAPI backend</text>
+  <text x="804" y="336" text-anchor="middle" font-size="13" fill="#5f6b7a">127.0.0.1:$BACKEND_PORT</text>
+
+  <rect x="692" y="376" width="224" height="60" rx="10" fill="#eef3f8" stroke="#8aa2b8" stroke-width="1.5"/>
+  <text x="804" y="400" text-anchor="middle" font-size="14" font-weight="600" fill="#232f3e">Vite preview + React SPA</text>
+  <text x="804" y="420" text-anchor="middle" font-size="13" fill="#5f6b7a">public $CDSW_APP_PORT</text>
+
+  <line x1="656" y1="356" x2="688" y2="330" stroke="#5f6b7a" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <line x1="804" y1="372" x2="804" y2="356" stroke="#5f6b7a" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <text x="812" y="368" font-size="12" fill="#5f6b7a">/api/* proxy</text>
+
+  <!-- Registry -->
+  <rect x="44" y="440" width="280" height="56" rx="10" fill="#ffffff" stroke="#c3ccd6" stroke-width="1.5"/>
+  <text x="184" y="464" text-anchor="middle" font-size="14" font-weight="600" fill="#232f3e">Cloudera AI model registry</text>
+  <text x="184" y="484" text-anchor="middle" font-size="13" fill="#5f6b7a">register / deploy trained heads</text>
+  <line x1="184" y1="422" x2="184" y2="436" stroke="#5f6b7a" stroke-width="1.8" marker-end="url(#arrow)"/>
+
+  <!-- Data feeds into engine -->
+  <line x1="600" y1="142" x2="420" y2="288" stroke="#5f6b7a" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <text x="540" y="222" font-size="12" fill="#5f6b7a">training splits</text>
+  <line x1="344" y1="214" x2="344" y2="288" stroke="#5f6b7a" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <text x="352" y="240" font-size="12" fill="#5f6b7a">checkpoint</text>
+
+  <!-- Browser -->
+  <rect x="692" y="452" width="224" height="44" rx="10" fill="#fdf3ec" stroke="#f96702" stroke-width="1.5"/>
+  <text x="804" y="480" text-anchor="middle" font-size="14" font-weight="600" fill="#232f3e">Analyst browser (cockpit)</text>
+  <line x1="804" y1="448" x2="804" y2="440" stroke="#f96702" stroke-width="1.8" marker-start="url(#arrowO)" marker-end="url(#arrowO)"/>
+</svg>

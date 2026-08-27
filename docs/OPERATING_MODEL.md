@@ -146,7 +146,7 @@ Each accelerator deploys onto the **running platform** through native service AP
 ```
 
 > **Platform provisioning is one-time:** the CML workspace and (optionally) a GPU runtime
-> are stood up once (see [`../infra/README.md`](../infra/README.md)); every deploy after
+> are stood up once (see [`../deploy/README.md`](../deploy/README.md)); every deploy after
 > that is declarative via the AMP manifest.
 
 | Layer | What it automates | APIs & tools (this accelerator) |
@@ -167,7 +167,7 @@ Every team produces the **same structure**, so any solution deploys clean from t
 ```
 cloudera-forge-fsi-foundational-model/   (folder name: demo-foundational-model)
 ├── docs/          APP_GUIDE · runbooks · architecture · business case
-├── infra/         install_deps · build_frontend · VAST/NEXUS probes · docker/
+├── deploy/         install_deps · build_frontend · VAST/NEXUS probes · docker/
 ├── data/          layer docs — data lives on VAST/S3 + Impala (see data/README.md)
 ├── pipelines/     fetch_model.py · prepare_data.py (AMP jobs)
 ├── ai/            layer docs — inference lives in src/ + tfm_demo/ (ADR-001)
@@ -185,7 +185,7 @@ tasks from install to the running Application.**
 
 What makes this the standard:
 
-- **Provisioning scripted** — the environment is stood up from `infra/`
+- **Provisioning scripted** — the environment is stood up from `deploy/`
 - **Pipelines & AI included** — fetch, prepare, embed, score, compare — wired
 - **Governance packaged** — model cards travel with the repo
 - **The Phase-4 gate** — runs clean from the repo alone
@@ -194,7 +194,7 @@ What makes this the standard:
 
 | Directory | Build-standard layer | README |
 |-----------|----------------------|--------|
-| `infra/` | Platform provisioning (one-time) | [infra/README.md](../infra/README.md) |
+| `deploy/` | Platform provisioning (one-time) | [deploy/README.md](../deploy/README.md) |
 | `data/` | Ingest + Lakehouse | [data/README.md](../data/README.md) |
 | `pipelines/` | Process (AMP tasks) | [pipelines/README.md](../pipelines/README.md) |
 | `ai/` | AI layer (agent · model serving) | [ai/README.md](../ai/README.md) |

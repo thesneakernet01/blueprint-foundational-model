@@ -154,7 +154,7 @@ back on read; Parquet keeps the original names.
   **Cost warning:** the NEXUS endpoint is a single-tenant `ml.p5en.48xlarge`
   (~$60+/hr) — deploy it right before the demo window and delete it right
   after; this app never creates or deletes endpoints. Live transport ships
-  disabled until Fundamental access lands — run `infra/nexus_probe.py` and
+  disabled until Fundamental access lands — run `deploy/nexus_probe.py` and
   follow the day-one checklist in `docs/nexus-ltm-design.md`.
 
 Built on the NVIDIA AI Blueprint *Transaction Foundation Model* (Apache-2.0).

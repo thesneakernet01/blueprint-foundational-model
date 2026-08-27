@@ -6,13 +6,13 @@ stages: [build, test, deploy]
 build:
   stage: build
   script:
-    - python infra/install_deps.py
-    - python infra/build_frontend.py
+    - python deploy/install_deps.py
+    - python deploy/build_frontend.py
 
 test:
   stage: test
   script:
-    - python infra/vast_probe.py        # on-cluster connectivity gate
+    - python deploy/vast_probe.py        # on-cluster connectivity gate
 
 deploy:
   stage: deploy

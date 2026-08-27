@@ -10,7 +10,7 @@ services:
   backend:
     build:
       context: .
-      dockerfile: infra/docker/backend.Dockerfile
+      dockerfile: deploy/docker/backend.Dockerfile
     environment:
       HOST: "0.0.0.0"
       PORT: "7100"
@@ -21,7 +21,7 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: infra/docker/frontend.Dockerfile
+      dockerfile: deploy/docker/frontend.Dockerfile
     ports:
       - "8100:80"
     depends_on:

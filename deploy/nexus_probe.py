@@ -21,7 +21,7 @@ env); the stub path itself is exercised by the app, not this probe.
 Run from a CML session or the demo box:
 
     NEXUS_MODE=live NEXUS_ENDPOINT_NAME=... NEXUS_S3_BUCKET=... \
-        python infra/nexus_probe.py
+        python deploy/nexus_probe.py
 """
 
 from __future__ import annotations

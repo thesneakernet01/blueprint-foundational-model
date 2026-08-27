@@ -1,0 +1,61 @@
+# Cloudera Blueprint catalog metadata
+# Populate fields used by the master blueprint website and internal catalog.
+
+# --- Identity ---
+name: "Transaction Foundation Model — Live Fraud Inference"
+slug: "cloudera-forge-fsi-foundational-model"     # URL-safe repo / catalog identifier
+description: "Live fraud-inference cockpit for NVIDIA's Transaction Foundation Model on Cloudera AI: GPU tokenizer, TFM decoder embeddings, PCA-64, and three XGBoost heads with AUC/AP lift and UMAP views in a React SPA, backed by Impala and VAST S3."
+reprise_link: ""                              # Public reprise link
+
+# --- Classification (website filters) ---
+catalog_classification:
+  - Launchable (AMP)                          # Options: Enterprise Blueprint | Research | Launchable (AMP) | Developer Example
+launchable: true                              # true | false
+lifecycle_status: Active                      # e.g., Active | Deprecated
+
+# --- Industry & alignment ---
+industry: Financial Services                  # e.g., General | Telecom | Financial Services | Healthcare & Life Sciences | Retail | Media | Physical AI & Robotics
+industry_alignment: "Vertical"                # Horizontal | Vertical
+target_vertical: "Banking & Payments — card fraud detection"  # Optional finer-grained vertical
+
+# --- Tags (website search & browse) ---
+tags:
+  - foundation-model
+  - fraud-detection
+  - transaction-embeddings
+  - xgboost
+  - rapids
+  - gpu-inference
+  - fastapi
+  - react
+  - impala
+  - vast-s3
+  - amp
+  - tabformer
+
+# --- Relationships ---
+product_mapping:                              # Cloudera products used
+  - Cloudera AI (CML)
+  - Cloudera AI Applied ML Prototypes (AMP)
+  - Cloudera AI Model Registry
+  - Impala (Cloudera Data Warehouse)
+model_dependencies:                           # Models, embeddings, or external AI services, if any. Comment out if none.
+  - NVIDIA Transaction Foundation Model (decoder checkpoint)
+  - XGBoost fraud classifier heads (trained in-app)
+  - NEXUS LTM endpoint (optional long-term-memory head)
+
+# --- Provenance ---
+publisher: cloudera                           # cloudera | partner-name
+source: Internal                              # Internal | Partner | NVIDIA Adaptation | Customer
+
+# --- Repository & assets ---
+public_github_link: "https://git.schuler.me/thesneakernet/demo-foundational-model"
+#private_github_link: ""                      # If applicable, original repo during development
+
+# --- Ownership ---
+maintainer_name: "Michael Schuler"
+
+# --- Dates ---
+date_created: "2026-06-08"
+date_updated: "2026-08-27"
+published_date: "2026-08-27"                  # Published date / last modified

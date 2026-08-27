@@ -30,9 +30,9 @@ from pathlib import Path
 
 # Import the user-local Node helpers from the sibling build script.
 try:
-    _SCRIPTS = Path(__file__).resolve().parent.parent / "infra"
+    _SCRIPTS = Path(__file__).resolve().parent.parent / "deploy"
 except NameError:
-    _SCRIPTS = Path.cwd() / "infra"
+    _SCRIPTS = Path.cwd() / "deploy"
 sys.path.insert(0, str(_SCRIPTS))
 from build_frontend import build, ensure_node, npm_env, project_root  # noqa: E402
 

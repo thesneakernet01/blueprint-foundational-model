@@ -6,7 +6,7 @@ React SPA.
 
 | Path | Contents |
 |------|----------|
-| `serve_app.py` | The Application entry point (AMP task 5) — builds `frontend/dist` if missing (Node helpers imported from `infra/build_frontend.py`), starts both processes, supervises them. |
+| `serve_app.py` | The Application entry point (AMP task 5) — builds `frontend/dist` if missing (Node helpers imported from `deploy/build_frontend.py`), starts both processes, supervises them. |
 | `frontend/` | The React SPA cockpit: live scoring, AUC/AP lift, UMAP, data dialog, settings. |
 
 ## Run it
@@ -14,7 +14,7 @@ React SPA.
 ```bash
 python app/serve_app.py            # both processes (build on demand)
 cd app/frontend && npm run dev     # frontend dev server
-docker compose up -d --build       # containerized (repo root; infra/docker/)
+docker compose up -d --build       # containerized (repo root; deploy/docker/)
 ```
 
 ## Conventions

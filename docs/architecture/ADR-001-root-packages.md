@@ -22,14 +22,14 @@ contract and the blueprint-staging logic for zero functional gain.
 1. Keep `src/`, `tfm_demo/`, `app.py`, `export_for_demo.py`, `models/`,
    `requirements-*.txt`, `docker-compose.yml`, and the untracked `.vast.env` at the repo
    root, annotated in the root README tree.
-2. Split the former `scripts/` by layer: install/build/probes → `infra/`, data/model jobs
+2. Split the former `scripts/` by layer: install/build/probes → `deploy/`, data/model jobs
    → `pipelines/`, the Application entry → `app/serve_app.py` (which imports the Node
-   helpers from `infra/build_frontend.py`).
-3. `frontend/` → `app/frontend/`; `docker/` → `infra/docker/`.
+   helpers from `deploy/build_frontend.py`).
+3. `frontend/` → `app/frontend/`; `docker/` → `deploy/docker/`.
 
 ## Consequences
 
-- `.project-metadata.yaml`'s five task scripts point at the new `infra/`, `pipelines/`,
+- `.project-metadata.yaml`'s five task scripts point at the new `deploy/`, `pipelines/`,
   and `app/` paths.
 - `tfm_demo/jobs.py` launches `pipelines/prepare_data.py` (was `scripts/…`).
 - All scripts keep their `parent.parent` root derivation — every new home is exactly one

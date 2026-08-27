@@ -7,7 +7,7 @@
 
 | Check | Where | What it asserts |
 |-------|-------|-----------------|
-| Connectivity probes | `infra/vast_probe.py` · `infra/nexus_probe.py` | VAST S3 and NEXUS endpoints answer. |
+| Connectivity probes | `deploy/vast_probe.py` · `deploy/nexus_probe.py` | VAST S3 and NEXUS endpoints answer. |
 | Engine round trip | manual (UI or `/api`) | A raw transaction tokenizes → embeds → scores in REAL mode; DEMO-FALLBACK works without the checkpoint. |
 | Data path | `pipelines/prepare_data.py` output | Impala external tables readable (see `docs/impala-vast-s3-config.md`). |
 

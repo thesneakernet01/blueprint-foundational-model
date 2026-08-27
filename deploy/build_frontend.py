@@ -11,7 +11,7 @@ needed and nothing outside the user's home is touched. The downloaded Node's
 Vite preview server from the same user-local toolchain.
 
 Run:
-    python infra/build_frontend.py
+    python deploy/build_frontend.py
 Override the toolchain location / version with $NODE_PREFIX / $NODE_VERSION.
 """
 

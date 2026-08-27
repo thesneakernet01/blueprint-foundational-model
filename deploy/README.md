@@ -1,4 +1,4 @@
-# infra/ — provisioning · toolchain · connectivity probes
+# deploy/ — provisioning · toolchain · connectivity probes
 
 Stands up the environment this accelerator runs in: pinned Python installs, a user-local
 Node toolchain, connectivity diagnostics for the external platforms (VAST, NEXUS), and the

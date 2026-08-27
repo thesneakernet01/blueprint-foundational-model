@@ -61,8 +61,8 @@ The AMP runs four one-shot Jobs, then starts the Application:
 
 | Step | Script | What it does |
 |---|---|---|
-| Install dependencies | `infra/install_deps.py` | `requirements-demo.txt` (web layer) + `requirements-gpu.txt` (RAPIDS cu12, torch cu121, transformers, xgboost — carefully pinned, see below). Slow: multi-GB wheels. |
-| Build frontend SPA | `infra/build_frontend.py` | Installs Node user-locally (`~/.local/node`, no root) and runs `npm ci && npm run build` → `app/frontend/dist`. |
+| Install dependencies | `deploy/install_deps.py` | `requirements-demo.txt` (web layer) + `requirements-gpu.txt` (RAPIDS cu12, torch cu121, transformers, xgboost — carefully pinned, see below). Slow: multi-GB wheels. |
+| Build frontend SPA | `deploy/build_frontend.py` | Installs Node user-locally (`~/.local/node`, no root) and runs `npm ci && npm run build` → `app/frontend/dist`. |
 | Fetch model checkpoint | `pipelines/fetch_model.py` | Downloads the decoder checkpoint into `models/` and the blueprint's `src/` package (tokenizer + inference code) over plain HTTPS — no git-lfs needed. |
 | Prepare TabFormer data | `pipelines/prepare_data.py` | Downloads TabFormer (~2.4 GB from IBM Box) and writes the temporal splits. **Exits 0 with guidance if storage isn't configured yet** — expected on a fresh deploy; you re-run it from the UI in step 3. |
 | **TFM Fraud Demo** (Application) | `app/serve_app.py` | Backend + UI in one GPU container; `bypass_authentication: true`, so the URL is publicly reachable. |
@@ -144,7 +144,7 @@ NEXUS (Fundamental Large Tabular Model) card — persists to
   before the demo, delete right after; this app never creates or deletes
   endpoints. The live transport ships intentionally disabled until Fundamental
   access lands — day-one checklist in `docs/nexus-ltm-design.md`, verification
-  via `infra/nexus_probe.py`.
+  via `deploy/nexus_probe.py`.
 
 NEXUS degrades on its own (2.5 s score budget; a timeout shows `—`) and REAL
 mode never depends on it.
@@ -174,7 +174,7 @@ Handled automatically — listed so nobody "fixes" them backwards:
   job; it downloads the blueprint `src/` package as well as the checkpoint.
 - **Prepare-data job "succeeded" but no data** — that's the unconfigured-storage
   guard. Configure the Data dialog, then click **Load TabFormer** in the UI.
-- **S3 uploads stall or fail** — run `infra/vast_upload_probe.py` and check
+- **S3 uploads stall or fail** — run `deploy/vast_upload_probe.py` and check
   the wire-config banner; tune `$VAST_UPLOAD_*` before touching code. If the
   store can't parse trailing checksums, set `$VAST_TRAILING_CHECKSUMS=0`
   (and/or `$VAST_EXPECT_100=0`). Also confirm the dialog's *folder* field is

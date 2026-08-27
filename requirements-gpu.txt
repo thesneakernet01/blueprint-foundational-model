@@ -3,7 +3,7 @@
 #   - cudf / cuml / cupy  (RAPIDS): GPU tokenizer dataframes, UMAP + PCA
 #   - torch + transformers: the decoder foundation model + tokenizer
 #   - xgboost + scikit-learn: the three fraud heads and the preprocessing/PCA
-# Installed by scripts/install_deps.py alongside requirements-demo.txt.
+# Installed by deploy/install_deps.py alongside requirements-demo.txt.
 #
 # RAPIDS and some CUDA wheels live on NVIDIA's index, not PyPI; torch's CUDA 12
 # build lives on PyTorch's own index. (Unqualified `torch` on PyPI now pulls a

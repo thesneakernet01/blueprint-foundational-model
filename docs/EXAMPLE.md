@@ -46,7 +46,7 @@ embedding lift of NVIDIA's Transaction Foundation Model over raw features.
 ## Try it
 
 ```bash
-python infra/install_deps.py && python infra/build_frontend.py
+python deploy/install_deps.py && python deploy/build_frontend.py
 python pipelines/fetch_model.py && python pipelines/prepare_data.py
 python app/serve_app.py
 # No GPU/checkpoint? The engine's DEMO-FALLBACK mode still drives the UI.

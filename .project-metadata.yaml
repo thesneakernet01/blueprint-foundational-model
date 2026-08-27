@@ -93,7 +93,7 @@ tasks:
   - type: create_job
     name: Install dependencies
     entity_label: install_deps
-    script: infra/install_deps.py
+    script: deploy/install_deps.py
     arguments: None
     short_summary: Install the web layer + the NVIDIA/GPU Python stack (CUDA assumed present).
     kernel: Python 3.12
@@ -113,7 +113,7 @@ tasks:
   - type: create_job
     name: Build frontend SPA
     entity_label: build_frontend
-    script: infra/build_frontend.py
+    script: deploy/build_frontend.py
     arguments: None
     short_summary: Install Node user-locally and build the React SPA bundle.
     kernel: Python 3.12

@@ -1,20 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
 """
 Export demo artifacts — CLI shim.
-=================================
 
-The export is now primarily triggered from the UI (which runs it on the GPU
-backend via POST /api/export and streams progress). This script is the optional
-command-line equivalent of that same code path.
+The UI now triggers this via POST /api/export; this is the CLI equivalent,
+wrapping `run_export` from `tfm_demo/export.py`. Run once, from the repo root,
+after notebooks 04 (embeddings) and 05 (XGBoost):
 
-The implementation lives in `tfm_demo/export.py` (`run_export`). Run this ONCE
-inside the NeMo container, from the blueprint repo root, AFTER notebooks 04
-(embeddings) and 05 (XGBoost):
+    python export_for_demo.py
 
-    cd <blueprint repo root>
-    python tfm-demo/export_for_demo.py
-
-It writes everything into `tfm-demo/demo_artifacts/` and prints the lift numbers.
+Writes to `demo_artifacts/` and prints the lift numbers.
 """
 
 from __future__ import annotations

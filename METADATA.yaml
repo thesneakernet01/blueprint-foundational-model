@@ -49,7 +49,7 @@ publisher: cloudera                           # cloudera | partner-name
 source: Internal                              # Internal | Partner | NVIDIA Adaptation | Customer
 
 # --- Repository & assets ---
-public_github_link: "https://git.schuler.me/thesneakernet/demo-foundational-model"
+public_github_link: "https://github.com/thesneakernet01/blueprint-foundational-model"
 #private_github_link: ""                      # If applicable, original repo during development
 
 # --- Ownership ---

@@ -123,10 +123,10 @@ endpoint.
 | --- | --- |
 | `assets/` | Architecture diagram for this README |
 | `deploy/` | Provisioning: `install_deps.py`, `build_frontend.py`, VAST/NEXUS connectivity probes, `docker/` images for the compose path |
-| `docs/` | Extended documentation: `APP_GUIDE.md` (build/run), Impala/VAST config, NEXUS LTM design, demo scripts, presentations, business case, `FORGE_TEMPLATE.md` (prior Forge-style README) |
+| `docs/` | Extended documentation: `APP_GUIDE.md` (build/run), Impala/VAST config, NEXUS LTM design, demo scripts, presentations |
 | `METADATA.yaml` | Catalog metadata for the Cloudera blueprint website |
-| `.cicd/` | Illustrative build → test → deploy pipeline stub (the real execution surface is the AMP) |
 | `.project-metadata.yaml` | Cloudera AI AMP manifest — five tasks (deps, SPA build, checkpoint fetch, data prep, application) |
+| `workshop/` | Facilitator guide, glossary, and part 1/2 workshop materials |
 | `ai/` | Training walkthrough notebook (inference code lives in `src/` + `tfm_demo/`) |
 | `app/` | `serve_app.py` application entry point + `frontend/` React SPA cockpit |
 | `app.py` | Thin backend entrypoint (`uvicorn app:app`) re-exporting the `tfm_demo` package |
@@ -173,6 +173,4 @@ endpoint.
 - [`docs/presentations/README_DEMO.md`](docs/presentations/README_DEMO.md) — demo walkthrough
 - [`docs/presentations/demo-runbook-fsi.md`](docs/presentations/demo-runbook-fsi.md) — FSI runbook
 - [`docs/architecture/`](docs/architecture/) — architecture notes and ADRs
-- [`docs/business-case/`](docs/business-case/) — scorecard and business case
-- [`docs/OPERATING_MODEL.md`](docs/OPERATING_MODEL.md), [`docs/EXAMPLE.md`](docs/EXAMPLE.md), [`docs/GATES.md`](docs/GATES.md) — accelerator operating model
-- [`docs/FORGE_TEMPLATE.md`](docs/FORGE_TEMPLATE.md) — the prior Cloudera Forge-style root README
+- [`workshop/README.md`](workshop/README.md) — facilitator guide and workshop materials

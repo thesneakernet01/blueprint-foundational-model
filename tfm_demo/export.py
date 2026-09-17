@@ -32,6 +32,7 @@ from typing import Callable, Dict, Optional
 import numpy as np
 import joblib
 
+from . import accel
 from .config import ARTIFACTS as OUT
 from .config import (
     DATA_DIR, FRAUD_COL, MAX_LENGTH, MERCHANT_HASH_SIZE, MODEL_DIR, PCA_DIM,
@@ -388,8 +389,8 @@ def run_export(progress: Progress = None, budget: Optional[Dict] = None,
         pass
 
     OUT.mkdir(exist_ok=True)
-    xgb_device = "cuda" if torch.cuda.is_available() else "cpu"
-    emit(f"Compute device: {xgb_device}")
+    xgb_device = accel.xgb_device()
+    emit(f"Compute device: {xgb_device} (backend: {accel.backend()})")
 
     # ---- per split: load -> select -> embed -> free (peak = ONE split) ----
     # The model is loaded once, only if some split still needs embedding.

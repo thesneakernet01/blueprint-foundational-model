@@ -63,6 +63,7 @@ def create_app() -> FastAPI:
         return JSONResponse({
             "mode": engine.mode,
             "gpu": engine.gpu,
+            "gpu_backend": engine.gpu_backend,
             "detail": engine.detail,
             "model_dir": str(MODEL_DIR),
             "nexus": nexus.mode(),
@@ -222,6 +223,7 @@ def create_app() -> FastAPI:
             "service": "TFM Live Demo API",
             "mode": engine.mode,
             "gpu": engine.gpu,
+            "gpu_backend": engine.gpu_backend,
             "endpoints": ["/api/status", "/api/summary", "/api/examples",
                           "/api/umap", "/api/score", "/api/data",
                           "/api/runs", "/api/registry"],

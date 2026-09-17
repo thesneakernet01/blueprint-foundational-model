@@ -12,7 +12,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeout
 from typing import Dict, List, Optional, Tuple
 
-from . import nexus
+from . import accel, nexus
 from .config import (
     ARTIFACTS,
     MAX_LENGTH,
@@ -40,6 +40,7 @@ class Engine:
     def __init__(self) -> None:
         self.mode = "demo-fallback"      # flips to "real" if everything loads
         self.gpu = False
+        self.gpu_backend = "cpu"         # "cuda" | "rocm" | "cpu" -- accel.backend()
         self.detail = "not initialised"
         self.summary: Dict = {}
         self.examples: List[Dict] = []
@@ -65,6 +66,8 @@ class Engine:
             self.mode = "real"
             self.detail = "checkpoint + tokenizer + XGBoost heads loaded"
             log.info("REAL mode active: %s", self.detail)
+            log.info("GPU backend: %s (device=%s)", self.gpu_backend,
+                     accel.device_name() or "none")
         except Exception as exc:                       # noqa: BLE001
             self.mode = "demo-fallback"
             self.detail = f"falling back to synthetic scoring: {exc}"
@@ -100,6 +103,7 @@ class Engine:
         import joblib
 
         self.gpu = torch.cuda.is_available()
+        self.gpu_backend = accel.backend()
         if not MODEL_DIR.exists():
             raise FileNotFoundError(f"checkpoint missing at {MODEL_DIR} (run git lfs pull)")
         for f in ("preprocessor.joblib", "pca.joblib",

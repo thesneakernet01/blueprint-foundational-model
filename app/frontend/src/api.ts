@@ -7,10 +7,12 @@
 const API_BASE = import.meta.env.VITE_API_BASE || '';
 
 export type Mode = 'real' | 'demo-fallback' | string;
+export type GpuBackend = 'cuda' | 'rocm' | 'cpu' | string;
 
 export interface StatusResp {
   mode: Mode;
   gpu: boolean;
+  gpu_backend: GpuBackend;
   detail: string;
   model_dir: string;
 }

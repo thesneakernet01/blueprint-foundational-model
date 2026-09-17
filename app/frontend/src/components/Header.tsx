@@ -16,6 +16,8 @@ const VIEWS: { key: View; label: string }[] = [
   { key: 'lifecycle', label: 'Model Lifecycle' },
 ];
 
+const GPU_BACKEND_LABEL: Record<string, string> = { cuda: 'CUDA', rocm: 'ROCm' };
+
 function StatusDot({ tone }: { tone: 'green' | 'amber' | 'neutral' }) {
   const cls =
     tone === 'green'
@@ -78,7 +80,7 @@ export default function Header({ status, error, view, onViewChange, onBuild, onD
           </span>
           <span className="flex items-center gap-1.5">
             <StatusDot tone={status?.gpu ? 'green' : 'neutral'} />
-            {status?.gpu ? 'CUDA' : 'no GPU'}
+            {status?.gpu ? (GPU_BACKEND_LABEL[status.gpu_backend] ?? status.gpu_backend) : 'no GPU'}
           </span>
         </div>
         <div className="flex items-center gap-2">

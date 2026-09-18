@@ -66,6 +66,11 @@ blueprint repo so it can import `src/` and load the checkpoint). Key wiring:
 - **Mode** — `/api/status` reports `real` (checkpoint + GPU + artifacts loaded)
   or `demo-fallback` (synthetic, clearly labelled). The header badge shows it
   live, so the SPA works against a backend in either mode.
+- **Devices** — the same payload carries `gpu`/`gpu_backend` (`cuda`|`rocm`|`cpu`)
+  and, separately, `xgb_gpu`/`xgb_device`/`xgb_detail` for the XGBoost fraud
+  heads. They differ on AMD hardware: torch always uses the GPU there, while the
+  heads only do when AMD's ROCm/HIP build of XGBoost is installed. The header
+  shows both chips, with `xgb_detail` as the tooltip.
 
 Two common deployment shapes:
 

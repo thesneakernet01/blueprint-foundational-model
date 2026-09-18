@@ -131,7 +131,9 @@ def gpu_stack_versions() -> str:
     from importlib import metadata
 
     backend = accel.backend()
-    parts = [f"backend={backend}"]
+    xgb = accel.xgb_status()
+    parts = [f"backend={backend}",
+             f"xgb_device={xgb['device']}(build={xgb['build']})"]
     if backend == "cuda":
         names = ("cudf-cu12", "numba", "numba-cuda", "cuda-python", "rmm-cu12", "torch")
     else:

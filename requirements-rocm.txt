@@ -8,10 +8,9 @@
 # Deliberately NOT here: cudf-cu12 / cuml-cu12 / cupy-cuda12x / numba-cuda /
 # numba / cuda-python — RAPIDS has no ROCm port. Without it, the tokenizer /
 # preprocessing / UMAP stage runs on tfm_demo/rapids_shim.py's pandas +
-# scikit-learn + umap-learn stand-in instead, and the three XGBoost fraud
-# heads train with device="cpu" (mainline XGBoost's PyPI wheel has no
-# ROCm/HIP build either). Only the decoder foundation-model embedding step —
-# the torch half of REAL mode — actually runs on the AMD GPU.
+# scikit-learn + umap-learn stand-in instead. The decoder foundation-model
+# embedding step (torch) and — given AMD's XGBoost, see below — the three
+# fraud heads do run on the AMD GPU.
 --extra-index-url https://download.pytorch.org/whl/rocm6.2
 
 # torch's ROCm wheel. Pinned to match requirements-gpu.txt's torch==2.5.1
@@ -28,12 +27,29 @@ accelerate<2
 safetensors
 sentencepiece
 
-# Fraud heads (CPU device, see above) + the sklearn preprocessing/PCA used at
-# export time, + the RAPIDS-shim's own dependencies: pandas/scikit-learn
-# stand in for cudf/cuml, umap-learn stands in for cuml.manifold.UMAP
-# (export.py's UMAP step; omitted -> it just skips, same as today when cuml
-# is absent), pyarrow backs the shim's cudf.DataFrame.from_arrow.
+# Fraud heads. This PyPI wheel is the CPU-only *fallback*: mainline XGBoost
+# ships CUDA kernels only, so on AMD hardware it trains on the CPU.
+#
+# The GPU build is AMD's HIP port (github.com/AMD-Ecosystem/xgboost, built
+# -DUSE_HIP=ON) — it reports USE_HIP in xgboost.build_info() and still takes
+# device="cuda", since HIP is a source-level translation of the CUDA API.
+# AMD publishes no XGBoost wheel on repo.radeon.com, so it is installed
+# separately by deploy/install_deps.py: point $DEMO_XGBOOST_ROCM_WHEEL or
+# $DEMO_XGBOOST_ROCM_INDEX at a prebuilt one, or set
+# $DEMO_XGBOOST_ROCM_BUILD=1 to compile it with deploy/build_xgboost_rocm.sh.
+# Left deliberately unpinned so that an already-installed AMD build satisfies
+# this line and pip leaves it in place on re-runs.
+#
+# tfm_demo/accel.py decides per process which of the two is installed (and
+# smoke-trains on the GPU before trusting it); the answer shows up in the
+# server log, /api/status and the UI header.
 xgboost
+
+# The sklearn preprocessing/PCA used at export time, + the RAPIDS-shim's own
+# dependencies: pandas/scikit-learn stand in for cudf/cuml, umap-learn stands
+# in for cuml.manifold.UMAP (export.py's UMAP step; omitted -> it just skips,
+# same as today when cuml is absent), pyarrow backs the shim's
+# cudf.DataFrame.from_arrow.
 scikit-learn
 numpy
 pandas

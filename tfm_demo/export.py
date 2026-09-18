@@ -389,8 +389,13 @@ def run_export(progress: Progress = None, budget: Optional[Dict] = None,
         pass
 
     OUT.mkdir(exist_ok=True)
-    xgb_device = accel.xgb_device()
+    xgb_status = accel.xgb_status()
+    xgb_device = xgb_status["device"]
     emit(f"Compute device: {xgb_device} (backend: {accel.backend()})")
+    # Say plainly whether the heads are on the GPU and why -- on ROCm that
+    # turns on whether AMD's HIP build of XGBoost is the one installed.
+    emit(f"XGBoost heads: {'GPU' if xgb_status['gpu'] else 'CPU'} "
+         f"— {xgb_status['detail']}")
 
     # ---- per split: load -> select -> embed -> free (peak = ONE split) ----
     # The model is loaded once, only if some split still needs embedding.

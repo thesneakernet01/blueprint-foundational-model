@@ -12,6 +12,16 @@ Layers, all installed here:
     at runtime; see that module and tfm_demo/accel.py for the detection this
     mirrors.
 
+On the ROCm path the XGBoost that requirements-rocm.txt installs from PyPI is
+CPU-only, so _ensure_rocm_xgboost() then tries to replace it with AMD's HIP
+build (the one that reports USE_HIP in xgboost.build_info() and trains the
+fraud heads on the AMD GPU). Point it at a prebuilt wheel with
+$DEMO_XGBOOST_ROCM_WHEEL (a URL or path) or an index with
+$DEMO_XGBOOST_ROCM_INDEX, or set $DEMO_XGBOOST_ROCM_BUILD=1 to compile it from
+source via deploy/build_xgboost_rocm.sh. With none of those set the CPU wheel
+is left in place and the heads train on CPU — the app says which, so this
+degrades visibly rather than silently.
+
 torch is pinned to a CUDA 12 build on the NVIDIA path (see requirements-gpu.txt).
 Before installing that layer we purge any CUDA 13 packages a previous
 unpinned-torch install left behind, so re-runs converge on a clean cu12-only
@@ -43,6 +53,7 @@ except NameError:
 DEMO_REQS = _ROOT / "requirements-demo.txt"
 GPU_REQS = _ROOT / "requirements-gpu.txt"
 ROCM_REQS = _ROOT / "requirements-rocm.txt"
+ROCM_XGB_BUILD = _ROOT / "deploy" / "build_xgboost_rocm.sh"
 
 # CUDA-13 packages an unpinned `torch` pulls in. Our cu12 torch pin brings its
 # own *-cu12 deps, so these are orphans once torch is downgraded. Listed by the
@@ -110,6 +121,59 @@ def _accel_target() -> str:
     return "cuda"
 
 
+def _xgb_build_info() -> dict:
+    """xgboost.build_info() from a subprocess (this installer must keep running
+    even when the just-installed xgboost cannot import). {} on any failure."""
+    import json
+    code = "import json, xgboost; print(json.dumps(xgboost.build_info()))"
+    try:
+        r = subprocess.run([sys.executable, "-c", code], stdin=subprocess.DEVNULL,
+                           capture_output=True, text=True, timeout=120)
+        return json.loads(r.stdout.strip().splitlines()[-1]) if r.returncode == 0 else {}
+    except Exception:                                              # noqa: BLE001
+        return {}
+
+
+def _ensure_rocm_xgboost() -> None:
+    """Replace the CPU-only PyPI xgboost with AMD's HIP build, when we're told
+    where to get one. Never fails the Job: without a GPU-capable XGBoost the
+    heads simply train on CPU (tfm_demo/accel.py detects and reports that)."""
+    if _xgb_build_info().get("USE_HIP"):
+        print("XGBoost already has ROCm/HIP support (USE_HIP) — leaving it alone.",
+              flush=True)
+        return
+
+    wheel = os.environ.get("DEMO_XGBOOST_ROCM_WHEEL", "").strip()
+    index = os.environ.get("DEMO_XGBOOST_ROCM_INDEX", "").strip()
+    build = os.environ.get("DEMO_XGBOOST_ROCM_BUILD", "").strip()
+
+    if wheel:
+        print(f"Installing AMD XGBoost wheel: {wheel}", flush=True)
+        _pip("install", "--force-reinstall", "--no-deps", wheel, check=False)
+    elif index:
+        print(f"Installing AMD XGBoost from index: {index}", flush=True)
+        _pip("install", "--force-reinstall", "--index-url", index, "xgboost", check=False)
+    elif build and build != "0":
+        print(f"Building AMD XGBoost from source ({ROCM_XGB_BUILD}) — this takes a while.",
+              flush=True)
+        subprocess.run(["bash", str(ROCM_XGB_BUILD)], stdin=subprocess.DEVNULL, check=False)
+    else:
+        print("XGBoost on this ROCm host is the CPU-only PyPI build, so the fraud "
+              "heads will train on CPU. Set DEMO_XGBOOST_ROCM_WHEEL / "
+              "DEMO_XGBOOST_ROCM_INDEX, or DEMO_XGBOOST_ROCM_BUILD=1 to compile "
+              "AMD's HIP build (deploy/build_xgboost_rocm.sh).", flush=True)
+        return
+
+    info = _xgb_build_info()
+    if info.get("USE_HIP"):
+        print("AMD/ROCm XGBoost active — fraud heads will train on the AMD GPU.",
+              flush=True)
+    else:
+        print("WARNING: XGBoost still reports no HIP support "
+              f"(build_info={info or 'unavailable'}) — heads will train on CPU.",
+              flush=True)
+
+
 def main() -> None:
     _pip("install", "-r", str(DEMO_REQS))
     print("Demo (web-layer) dependencies installed.", flush=True)
@@ -121,6 +185,7 @@ def main() -> None:
         if accel == "rocm":
             _pip("install", "-r", str(ROCM_REQS))
             print("AMD/ROCm dependencies installed.", flush=True)
+            _ensure_rocm_xgboost()
         else:
             _purge_cuda13()
             _pip("install", "-r", str(GPU_REQS))

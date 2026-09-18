@@ -87,7 +87,7 @@ artifacts on VAST S3.
    [`docs/impala-vast-s3-config.md`](docs/impala-vast-s3-config.md)).
 5. Connectivity diagnostics: `python deploy/vast_probe.py` (VAST S3) and
    `python deploy/nexus_probe.py` (NEXUS LTM endpoint).
-6. **Off-GPU UI demo:** `docker compose up --build`, then open http://localhost:8100
+6. **Off-GPU UI demo:** `docker compose up --build`, then open http://localhost:8500
    (DEMO-FALLBACK mode).
 
 The authoritative build/run guide is [`docs/APP_GUIDE.md`](docs/APP_GUIDE.md).

@@ -87,7 +87,7 @@ composes *any* FM, not just NVIDIA's.
 | Export fails at `check` stage | The GPU host-copy canary caught a broken stack — this is the readable-failure design working; use your instance, debug later |
 | Storage connection fails | Data dialog → Save & test shows the probe error; `deploy/vast_probe.py` from a terminal for detail |
 | Endpoint build slow/stuck | Fall back to the instructor's pre-deployed endpoint for the `curl` step |
-| Whole room blocked on GPUs | Docker DEMO-FALLBACK path (localhost:8100): Ex 1–3 walkable with labelled synthetic scores; drop Ex 4 claims |
+| Whole room blocked on GPUs | Docker DEMO-FALLBACK path (localhost:8500): Ex 1–3 walkable with labelled synthetic scores; drop Ex 4 claims |
 
 ## After the session
 

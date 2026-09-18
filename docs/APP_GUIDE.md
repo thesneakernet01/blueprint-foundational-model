@@ -188,7 +188,7 @@ Handled automatically — listed so nobody "fixes" them backwards:
 ## Local UI preview (no Cloudera, no GPU)
 
 ```bash
-docker compose up --build     # then open http://localhost:8100
+docker compose up --build     # then open http://localhost:8500
 ```
 
 Real SPA + real FastAPI backend, but no GPU stack — the engine serves

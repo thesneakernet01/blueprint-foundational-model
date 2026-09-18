@@ -29,7 +29,7 @@ Cloudera + NVIDIA pattern beyond fraud in customer conversations.
   GPU inference engine and the SPA; CML exposes a single authenticated URL. The AMP is
   the repeatable deployment artifact an SE can stand up in a customer workspace.
 - Graceful degradation is a feature to sell: without a GPU or checkpoint the app boots
-  in a clearly-labelled **DEMO-FALLBACK** mode (`docker compose up` → localhost:8100),
+  in a clearly-labelled **DEMO-FALLBACK** mode (`docker compose up` → localhost:8500),
   so the UI always demos — but today's lab runs the REAL GPU path.
 
 ---

@@ -59,7 +59,7 @@ yourself in advance and demo Exercise 4's `curl` against it as a fallback.
 
 ## 5. Fallback plan
 
-- **No GPU available on the day**: `docker compose up --build` → http://localhost:8100
+- **No GPU available on the day**: `docker compose up --build` → http://localhost:8500
   runs the full UI in clearly-labelled DEMO-FALLBACK mode. Exercises 1–3 remain
   walkable (synthetic scores); skip the retrain-lift claims and Exercise 4.
 - **One instance dies mid-lab**: pair the attendee with a neighbor; state is per-project

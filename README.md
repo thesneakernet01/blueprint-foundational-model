@@ -1,4 +1,15 @@
-# Cloudera Blueprint: Transaction Foundation Model — Live Fraud Inference
+# Transaction Foundation Model — Live Fraud Inference
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.12%2B-blue.svg)](pyproject.toml)
+[![Cloudera Blueprint](https://img.shields.io/badge/Cloudera-Blueprint-f96702.svg)](METADATA.yaml)
+[![Stars](https://img.shields.io/github/stars/thesneakernet01/blueprint-foundational-model?logo=github)](https://github.com/thesneakernet01/blueprint-foundational-model/stargazers)
+[![Watchers](https://img.shields.io/github/watchers/thesneakernet01/blueprint-foundational-model?logo=github)](https://github.com/thesneakernet01/blueprint-foundational-model/watchers)
+[![Forks](https://img.shields.io/github/forks/thesneakernet01/blueprint-foundational-model?logo=github)](https://github.com/thesneakernet01/blueprint-foundational-model/network/members)
+
+
+<p align="center">
+  <img width="512" height="280" alt="image" src="https://github.com/user-attachments/assets/908e1a58-1a4d-4e8d-b291-b30abbb440f6" />
+</p>
 
 ## Table of Contents
 
@@ -174,3 +185,11 @@ endpoint.
 - [`docs/presentations/demo-runbook-fsi.md`](docs/presentations/demo-runbook-fsi.md) — FSI runbook
 - [`docs/architecture/`](docs/architecture/) — architecture notes and ADRs
 - [`workshop/README.md`](workshop/README.md) — facilitator guide and workshop materials
+
+## License
+
+This project is licensed under the [Apache License 2.0](LICENSE).
+
+## Disclaimer
+
+*This blueprint is intended for Proof-of-Concept and research use only. It is not designed for production deployment. Use in production environments is at the user's own risk. The authors and contributors accept no liability for operational impacts or damages.*

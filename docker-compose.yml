@@ -1,6 +1,6 @@
 # Docker Compose for demoing the TFM UI off-GPU.
 #
-#   docker compose up --build      then open  http://localhost:8100
+#   docker compose up --build      then open  http://localhost:8500
 #
 # Runs the real React SPA against the real FastAPI backend, but with none of the
 # heavy stack — so the engine serves DEMO-FALLBACK mode: synthetic, clearly
@@ -23,7 +23,7 @@ services:
       context: .
       dockerfile: deploy/docker/frontend.Dockerfile
     ports:
-      - "8100:80"
+      - "8500:80"
     depends_on:
       - backend
     restart: unless-stopped
@@ -41,4 +41,4 @@ services:
     command:
       - sh
       - -c
-      - pip install --quiet --no-cache-dir -r requirements-demo.txt numpy pytest httpx && pytest tests/unit -q
+      - pip install --quiet --no-cache-dir -r requirements-demo.txt numpy pandas scikit-learn pytest httpx && pytest tests/unit -q

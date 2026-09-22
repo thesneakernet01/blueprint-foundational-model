@@ -131,15 +131,22 @@ def _ram() -> Tuple[Optional[float], Optional[float]]:
 
 
 def _gpu() -> Dict:
-    """Name, utilization % and memory from nvidia-smi (None-filled if absent)."""
+    """Name, utilization % and memory — nvidia-smi on CUDA, rocm-smi on ROCm
+    (None-filled if neither is present). Same output schema either way, so
+    the frontend build-monitor doesn't need to know which vendor it's reading."""
     out = {"gpu_name": None, "gpu_util_pct": None,
            "gpu_mem_used_gb": None, "gpu_mem_total_gb": None}
-    smi = shutil.which("nvidia-smi")
-    if not smi:
-        return out
+    if shutil.which("nvidia-smi"):
+        return _gpu_nvidia(out)
+    if shutil.which("rocm-smi"):
+        return _gpu_rocm(out)
+    return out
+
+
+def _gpu_nvidia(out: Dict) -> Dict:
     try:
         r = subprocess.run(
-            [smi, "--query-gpu=name,utilization.gpu,memory.used,memory.total",
+            ["nvidia-smi", "--query-gpu=name,utilization.gpu,memory.used,memory.total",
              "--format=csv,noheader,nounits"],
             capture_output=True, text=True, timeout=3,
         )
@@ -151,6 +158,43 @@ def _gpu() -> Dict:
             gpu_mem_used_gb=round(float(used) * 2**20 / 1e9, 2),   # MiB -> GB
             gpu_mem_total_gb=round(float(total) * 2**20 / 1e9, 2),
         )
+    except Exception:                                              # noqa: BLE001
+        pass
+    return out
+
+
+def _gpu_rocm(out: Dict) -> Dict:
+    """rocm-smi's key names have drifted across ROCm releases (unlike
+    nvidia-smi's stable CSV schema), so this reads --json and probes a few
+    known key spellings rather than assuming one fixed layout."""
+    import json
+    try:
+        r = subprocess.run(
+            ["rocm-smi", "--showproductname", "--showuse", "--showmeminfo", "vram", "--json"],
+            capture_output=True, text=True, timeout=3,
+        )
+        data = json.loads(r.stdout)
+        card = next((v for k, v in data.items() if k.lower().startswith("card")), None)
+        if not card:
+            return out
+
+        def first(*keys):
+            for k in keys:
+                if k in card:
+                    return card[k]
+            return None
+
+        name = first("Card series", "Card Series", "GPU Name")
+        util = first("GPU use (%)", "GPU Use (%)", "GFX Activity")
+        used = first("VRAM Total Used Memory (B)", "VRAM Total Used Memory (bytes)")
+        total = first("VRAM Total Memory (B)", "VRAM Total Memory (bytes)")
+        out.update(gpu_name=name)
+        if util is not None:
+            out["gpu_util_pct"] = float(util)
+        if used is not None:
+            out["gpu_mem_used_gb"] = round(float(used) / 1e9, 2)
+        if total is not None:
+            out["gpu_mem_total_gb"] = round(float(total) / 1e9, 2)
     except Exception:                                              # noqa: BLE001
         pass
     return out

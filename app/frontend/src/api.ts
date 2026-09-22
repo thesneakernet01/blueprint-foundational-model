@@ -7,10 +7,20 @@
 const API_BASE = import.meta.env.VITE_API_BASE || '';
 
 export type Mode = 'real' | 'demo-fallback' | string;
+export type GpuBackend = 'cuda' | 'rocm' | 'cpu' | string;
 
 export interface StatusResp {
   mode: Mode;
   gpu: boolean;
+  gpu_backend: GpuBackend;
+  /** Device the XGBoost fraud heads train/score on: 'cuda' (NVIDIA CUDA build,
+   *  or AMD's HIP build — HIP keeps the 'cuda' device string) or 'cpu'. */
+  xgb_device: 'cuda' | 'cpu' | string;
+  /** True when those heads really run on the GPU. On ROCm this is false unless
+   *  AMD's HIP build of XGBoost is installed, even though gpu is true. */
+  xgb_gpu: boolean;
+  /** Human-readable why — e.g. "AMD ROCm/HIP build (xgboost 3.2.0)". */
+  xgb_detail: string;
   detail: string;
   model_dir: string;
 }

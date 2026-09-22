@@ -70,11 +70,17 @@ def configure_gpu_memory() -> None:
     if use_expandable:
         os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
+    from .rapids_shim import install as _install_rapids_shim
+    _install_rapids_shim()          # no-op when real cudf is importable
+
     try:
         import cudf
         import rmm
     except Exception as exc:                                       # noqa: BLE001
-        log.info("GPU memory config skipped (no RAPIDS stack): %s", exc)
+        # Expected on ROCm/CPU: the shim provides cudf but never rmm (it's a
+        # CUDA-only allocator with nothing to shim it against), so this
+        # correctly no-ops the RMM-pool/cuDF-spill config on those backends.
+        log.info("GPU memory config skipped (no RAPIDS/RMM stack): %s", exc)
         return
 
     _patch_cudf_compat(cudf)
@@ -102,6 +108,9 @@ def _patch_cudf_compat(cudf) -> None:
     `src/` stays verbatim. Currently: TimedeltaProperties.total_seconds()
     (added in cudf 25.02; the tokenizer's financial_pipeline.py calls it to
     derive time_delta_s). No-op once the real method exists."""
+    if not hasattr(cudf, "core"):
+        return              # the RAPIDS shim's cudf has no internal .core -- pandas
+                             # already has native Series.dt.total_seconds()
     props = cudf.core.series.TimedeltaProperties
     if hasattr(props, "total_seconds"):
         return
@@ -118,14 +127,26 @@ def gpu_stack_versions() -> str:
     """One-line version report of the packages on the device->host copy path.
     Emitted into the export log so a remote crash report pins the installed
     matrix without shell access to the box."""
+    from . import accel
     from importlib import metadata
-    parts = []
-    for name in ("cudf-cu12", "numba", "numba-cuda", "cuda-python", "rmm-cu12", "torch"):
+
+    backend = accel.backend()
+    xgb = accel.xgb_status()
+    parts = [f"backend={backend}",
+             f"xgb_device={xgb['device']}(build={xgb['build']})"]
+    if backend == "cuda":
+        names = ("cudf-cu12", "numba", "numba-cuda", "cuda-python", "rmm-cu12", "torch")
+    else:
+        parts.append("rapids=shimmed(pandas/scikit-learn)" if not accel.rapids_available()
+                     else "rapids=native")
+        names = ("torch", "xgboost", "umap-learn")
+    for name in names:
         try:
             parts.append(f"{name} {metadata.version(name)}")
         except Exception:                                          # noqa: BLE001
             parts.append(f"{name} ?")
-    parts.append("nv_binding=" + os.environ.get("NUMBA_CUDA_USE_NVIDIA_BINDING", "0"))
+    if backend == "cuda":
+        parts.append("nv_binding=" + os.environ.get("NUMBA_CUDA_USE_NVIDIA_BINDING", "0"))
     return " · ".join(parts)
 
 
@@ -144,6 +165,12 @@ def host_copy_canary(timeout: int = 300) -> Optional[str]:
     whole server down; in a child process it costs nothing. Returns None when
     the path is healthy, else a short human-readable failure description (exit
     code / signal + the tail of the child's stderr)."""
+    from . import accel
+    if accel.backend() != "cuda":
+        # The bug this probes (numba-cuda's ctypes shim vs. r580/CUDA-13
+        # driver symbol versioning) is CUDA-driver-specific and can't occur
+        # on ROCm or the pandas-backed shim -- nothing to bisect.
+        return None
     try:
         proc = subprocess.run(
             [sys.executable, "-c", _CANARY_CODE],

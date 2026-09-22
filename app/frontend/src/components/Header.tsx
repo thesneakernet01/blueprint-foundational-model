@@ -16,6 +16,17 @@ const VIEWS: { key: View; label: string }[] = [
   { key: 'lifecycle', label: 'Model Lifecycle' },
 ];
 
+const GPU_BACKEND_LABEL: Record<string, string> = { cuda: 'CUDA', rocm: 'ROCm' };
+
+// The XGBoost heads are a separate question from "is there a GPU": on an AMD
+// box torch always uses it, but the heads only do when AMD's ROCm/HIP build of
+// XGBoost is the one installed (see tfm_demo/accel.py). Spell that out rather
+// than letting the GPU dot imply it.
+function xgbLabel(status: StatusResp | null): string {
+  if (!status) return 'XGBoost …';
+  return `XGBoost ${status.xgb_gpu ? 'GPU' : 'CPU'}`;
+}
+
 function StatusDot({ tone }: { tone: 'green' | 'amber' | 'neutral' }) {
   const cls =
     tone === 'green'
@@ -78,7 +89,11 @@ export default function Header({ status, error, view, onViewChange, onBuild, onD
           </span>
           <span className="flex items-center gap-1.5">
             <StatusDot tone={status?.gpu ? 'green' : 'neutral'} />
-            {status?.gpu ? 'CUDA' : 'no GPU'}
+            {status?.gpu ? (GPU_BACKEND_LABEL[status.gpu_backend] ?? status.gpu_backend) : 'no GPU'}
+          </span>
+          <span className="flex items-center gap-1.5" title={status?.xgb_detail ?? undefined}>
+            <StatusDot tone={status?.xgb_gpu ? 'green' : 'neutral'} />
+            {xgbLabel(status)}
           </span>
         </div>
         <div className="flex items-center gap-2">

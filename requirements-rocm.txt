@@ -1,0 +1,57 @@
+# AMD ROCm stack for REAL mode. ROCm itself (driver + userspace) is already
+# installed in the runtime; these are the Python components the engine and
+# exporter import. Selected automatically by deploy/install_deps.py in place
+# of requirements-gpu.txt when the host has an AMD GPU (or forced with
+# DEMO_ACCEL=rocm) — see tfm_demo/accel.py for the runtime backend detection
+# this mirrors, and tfm_demo/rapids_shim.py for what replaces RAPIDS below.
+#
+# Deliberately NOT here: cudf-cu12 / cuml-cu12 / cupy-cuda12x / numba-cuda /
+# numba / cuda-python — RAPIDS has no ROCm port. Without it, the tokenizer /
+# preprocessing / UMAP stage runs on tfm_demo/rapids_shim.py's pandas +
+# scikit-learn + umap-learn stand-in instead. The decoder foundation-model
+# embedding step (torch) and — given AMD's XGBoost, see below — the three
+# fraud heads do run on the AMD GPU.
+--extra-index-url https://download.pytorch.org/whl/rocm6.2
+
+# torch's ROCm wheel. Pinned to match requirements-gpu.txt's torch==2.5.1
+# baseline; the +rocm6.2 tag must match the ROCm userspace actually installed
+# on the target box (check `rocminfo` / /opt/rocm/.info/version) — bump this
+# alongside the host's ROCm version the same way requirements-gpu.txt tracks
+# the CUDA driver.
+torch==2.5.1+rocm6.2
+
+# Decoder foundation model + tokenizer. Pinned to the checkpoint's saved
+# transformers_version, same reasoning as requirements-gpu.txt.
+transformers==4.53.*
+accelerate<2
+safetensors
+sentencepiece
+
+# Fraud heads. This PyPI wheel is the CPU-only *fallback*: mainline XGBoost
+# ships CUDA kernels only, so on AMD hardware it trains on the CPU.
+#
+# The GPU build is AMD's HIP port (github.com/AMD-Ecosystem/xgboost, built
+# -DUSE_HIP=ON) — it reports USE_HIP in xgboost.build_info() and still takes
+# device="cuda", since HIP is a source-level translation of the CUDA API.
+# AMD publishes no XGBoost wheel on repo.radeon.com, so it is installed
+# separately by deploy/install_deps.py: point $DEMO_XGBOOST_ROCM_WHEEL or
+# $DEMO_XGBOOST_ROCM_INDEX at a prebuilt one, or set
+# $DEMO_XGBOOST_ROCM_BUILD=1 to compile it with deploy/build_xgboost_rocm.sh.
+# Left deliberately unpinned so that an already-installed AMD build satisfies
+# this line and pip leaves it in place on re-runs.
+#
+# tfm_demo/accel.py decides per process which of the two is installed (and
+# smoke-trains on the GPU before trusting it); the answer shows up in the
+# server log, /api/status and the UI header.
+xgboost
+
+# The sklearn preprocessing/PCA used at export time, + the RAPIDS-shim's own
+# dependencies: pandas/scikit-learn stand in for cudf/cuml, umap-learn stands
+# in for cuml.manifold.UMAP (export.py's UMAP step; omitted -> it just skips,
+# same as today when cuml is absent), pyarrow backs the shim's
+# cudf.DataFrame.from_arrow.
+scikit-learn
+numpy
+pandas
+umap-learn
+pyarrow

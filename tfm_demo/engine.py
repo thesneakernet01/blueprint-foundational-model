@@ -12,7 +12,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeout
 from typing import Dict, List, Optional, Tuple
 
-from . import nexus
+from . import accel, nexus
 from .config import (
     ARTIFACTS,
     MAX_LENGTH,
@@ -40,6 +40,13 @@ class Engine:
     def __init__(self) -> None:
         self.mode = "demo-fallback"      # flips to "real" if everything loads
         self.gpu = False
+        self.gpu_backend = "cpu"         # "cuda" | "rocm" | "cpu" -- accel.backend()
+        # Whether the XGBoost fraud heads themselves train/score on the GPU.
+        # Separate from gpu_backend: an AMD box runs torch on the GPU whether
+        # or not the installed XGBoost is AMD's HIP build (see accel.xgb_status).
+        self.xgb_device = "cpu"          # "cuda" | "cpu"
+        self.xgb_gpu = False
+        self.xgb_detail = "not initialised"
         self.detail = "not initialised"
         self.summary: Dict = {}
         self.examples: List[Dict] = []
@@ -60,16 +67,35 @@ class Engine:
     # -- startup -------------------------------------------------------------
     def warmup(self) -> None:
         self._load_static_assets()
+        self._detect_xgb_device()
         try:
             self._load_real_stack()
             self.mode = "real"
             self.detail = "checkpoint + tokenizer + XGBoost heads loaded"
             log.info("REAL mode active: %s", self.detail)
+            log.info("GPU backend: %s (device=%s)", self.gpu_backend,
+                     accel.device_name() or "none")
         except Exception as exc:                       # noqa: BLE001
             self.mode = "demo-fallback"
             self.detail = f"falling back to synthetic scoring: {exc}"
             log.warning("DEMO-FALLBACK mode: %s", exc)
         self._ready = True
+
+    def _detect_xgb_device(self) -> None:
+        """Ask accel whether the installed XGBoost can actually use this GPU —
+        on ROCm that means AMD's HIP build, and the probe inside runs a two-round
+        GPU fit before saying yes. Reported in the log, /api/status and the UI
+        header so "are the heads on the GPU?" is never a guess."""
+        try:
+            xgb = accel.xgb_status()
+        except Exception as exc:                       # noqa: BLE001
+            self.xgb_detail = f"device detection failed: {exc}"
+            log.warning("XGBoost device detection failed: %s", exc)
+            return
+        self.xgb_device, self.xgb_gpu = xgb["device"], xgb["gpu"]
+        self.xgb_detail = xgb["detail"]
+        log.info("XGBoost heads: %s (device=%s) — %s",
+                 "GPU" if self.xgb_gpu else "CPU", self.xgb_device, self.xgb_detail)
 
     def _load_static_assets(self) -> None:
         """summary / examples / umap background are cheap JSON — load if present."""
@@ -100,6 +126,7 @@ class Engine:
         import joblib
 
         self.gpu = torch.cuda.is_available()
+        self.gpu_backend = accel.backend()
         if not MODEL_DIR.exists():
             raise FileNotFoundError(f"checkpoint missing at {MODEL_DIR} (run git lfs pull)")
         for f in ("preprocessor.joblib", "pca.joblib",

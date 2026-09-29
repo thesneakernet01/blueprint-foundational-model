@@ -1,6 +1,7 @@
 /* Brand typography from the Cloudera marketing deck: Plus Jakarta Sans for
-   text, JetBrains Mono kept for numerals/IDs (consistent across platforms). */
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+   text, JetBrains Mono kept for numerals/IDs (consistent across platforms).
+   Bundled via @fontsource (imported in main.tsx) so air-gapped clusters need
+   no access to Google Fonts. */
 
 @tailwind base;
 @tailwind components;

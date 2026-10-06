@@ -13,7 +13,7 @@ export interface StatusResp {
   mode: Mode;
   gpu: boolean;
   gpu_backend: GpuBackend;
-  /** Device the XGBoost fraud heads train/score on: 'cuda' (NVIDIA CUDA build,
+  /** Device the XGBoost fraud heads train/score on: 'cuda' (CUDA build,
    *  or AMD's HIP build — HIP keeps the 'cuda' device string) or 'cpu'. */
   xgb_device: 'cuda' | 'cpu' | string;
   /** True when those heads really run on the GPU. On ROCm this is false unless

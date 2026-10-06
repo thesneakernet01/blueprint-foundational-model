@@ -31,7 +31,7 @@ Token sequence (max_length = 128, vocab = 6,251, merchant hash size = 2,000)
   what's your state now?" — the final hidden state (512 numbers) *is* the embedding.
 - Code anchors: tokenizer settings in `tfm_demo/config.py` (`MAX_LENGTH = 128`,
   `MERCHANT_HASH_SIZE = 2000`); single-transaction path in
-  `tfm_demo/engine.py::_embed_one`; the fetched NVIDIA blueprint package lives in
+  `tfm_demo/engine.py::_embed_one`; the fetched TFM blueprint package lives in
   `src/`.
 
 ---

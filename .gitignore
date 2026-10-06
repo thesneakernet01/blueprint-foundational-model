@@ -9,11 +9,11 @@ venv/
 demo_artifacts/
 
 # Foundation-model checkpoint — fetched at deploy time by scripts/fetch_model.py
-# (Git LFS blob from the NVIDIA blueprint, ~56 MB); not committed here.
+# (Git LFS blob from the upstream TFM blueprint, ~56 MB); not committed here.
 models/
 
 # Blueprint src/ package (tokenizer, decoder inference) — also fetched at deploy
-# time by scripts/fetch_model.py; upstream NVIDIA code, not committed here.
+# time by scripts/fetch_model.py; upstream TFM code, not committed here.
 # Anchored to the repo root: frontend/src is real, committed source.
 /src/
 

@@ -1,6 +1,6 @@
 # Transaction Foundation Model — Live Fraud Inference
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.12%2B-blue.svg)](pyproject.toml)
+[![Python](https://img.shields.io/badge/Python-3.12%2B-blue.svg)](.project-metadata.yaml)
 [![Cloudera Blueprint](https://img.shields.io/badge/Cloudera-Blueprint-f96702.svg)](METADATA.yaml)
 [![Stars](https://img.shields.io/github/stars/thesneakernet01/blueprint-foundational-model?logo=github)](https://github.com/thesneakernet01/blueprint-foundational-model/stargazers)
 [![Watchers](https://img.shields.io/github/watchers/thesneakernet01/blueprint-foundational-model?logo=github)](https://github.com/thesneakernet01/blueprint-foundational-model/watchers)
@@ -27,8 +27,8 @@
 
 ## Overview
 
-This blueprint is a live fraud-inference cockpit for NVIDIA's Transaction Foundation
-Model (TFM) running on Cloudera AI with a VAST S3 + Impala data layer. A raw payment
+This blueprint is a live fraud-inference cockpit for a Transaction Foundation
+Model (TFM), trained on the TabFormer credit-card dataset, running on Cloudera AI with a VAST S3 + Impala data layer. A raw payment
 transaction flows through a GPU tokenizer and the TFM decoder to a 512-dimension
 last-token embedding, then through PCA-64 into three XGBoost fraud heads (raw features /
 embeddings / combined, plus an optional NEXUS long-term-memory head), and the React SPA
@@ -81,8 +81,8 @@ artifacts on VAST S3.
 
 1. Clone the repository.
 2. **Deploy as an AMP (recommended):** in a Cloudera AI workspace, create a new project
-   from this repo as an AMP; `.project-metadata.yaml` provisions the five tasks on an
-   NVIDIA GPU runtime (JupyterLab / Python 3.12 / Nvidia GPU edition).
+   from this repo as an AMP; `.project-metadata.yaml` provisions the five tasks on a
+   GPU runtime (JupyterLab / Python 3.12 / GPU edition).
 3. **Or run the same steps manually:**
 
    ```bash
@@ -105,9 +105,9 @@ The authoritative build/run guide is [`docs/APP_GUIDE.md`](docs/APP_GUIDE.md).
 
 ## Architecture / Software Components
 
-The `prepare_data.py` pipeline downloads the IBM TabFormer credit-card dataset
+The `prepare_data.py` pipeline downloads the TabFormer credit-card dataset
 (~2.4 GB), reproduces the temporal train / val / test split, and loads it into Impala
-tables with Parquet artifacts on VAST S3; `fetch_model.py` downloads the NVIDIA TFM
+tables with Parquet artifacts on VAST S3; `fetch_model.py` downloads the TFM
 decoder checkpoint and the blueprint's `src/` tokenizer package. A single Cloudera AI
 application container then runs both halves of the demo: the FastAPI backend
 (`tfm_demo/`) hosts the GPU inference engine — RAPIDS/cuDF tokenizer dataframes, the
@@ -148,22 +148,22 @@ endpoint.
 | `models/` | Fetched TFM decoder checkpoint (weights gitignored) |
 | `pipelines/` | AMP jobs: `fetch_model.py`, `prepare_data.py` |
 | `requirements-demo.txt` | Web-layer Python dependencies |
-| `requirements-gpu.txt` | Pinned NVIDIA stack: RAPIDS cu12, torch cu121, transformers, XGBoost |
+| `requirements-gpu.txt` | Pinned GPU stack: RAPIDS cu12, torch cu121, transformers, XGBoost |
 | `requirements-nexus.txt` | Optional NEXUS LTM client dependencies |
-| `src/` | Blueprint package from the NVIDIA TFM repo: tokenizer + decoder inference |
+| `src/` | Blueprint package from the upstream TFM repo: tokenizer + decoder inference |
 | `tests/` | Unit, data-quality, and AI-eval test conventions |
 | `tfm_demo/` | The backend package: FastAPI app, inference engine, Impala/VAST readers, jobs, registry |
 
 ## Prerequisites
 
-- Cloudera AI (CML) workspace with an NVIDIA GPU ML Runtime (JupyterLab, Python 3.12,
-  Nvidia GPU edition; CUDA 12 driver) for REAL-mode inference and training
+- Cloudera AI (CML) workspace with a GPU ML Runtime (JupyterLab, Python 3.12,
+  GPU edition; CUDA 12 driver) for REAL-mode inference and training
 - Impala virtual warehouse reachable from the workspace (training splits are stored in
   and read from Impala tables)
 - VAST S3 credentials in an untracked `.vast.env` (`VAST_ACCESS_KEY` /
   `VAST_SECRET_KEY` + endpoint settings) for Parquet artifacts
-- Outbound HTTPS to download the TFM checkpoint (NVIDIA repo) and the TabFormer dataset
-  (IBM Box, ~2.4 GB)
+- Outbound HTTPS to download the TFM checkpoint (upstream TFM repo) and the TabFormer
+  dataset (~2.4 GB)
 - Optional: NEXUS LTM endpoint access (`requirements-nexus.txt`, `deploy/nexus_probe.py`)
 - For the off-GPU UI demo only: Docker with Compose
 
@@ -171,9 +171,9 @@ endpoint.
 
 | Deployment | Minimum |
 | --- | --- |
-| Launchable / demo (AMP) | 4 CPU, 16 GB RAM, 1 NVIDIA GPU (CUDA 12, ~16 GB VRAM recommended), ~30 GB storage for wheels + dataset + checkpoint — per the AMP task profiles (2–4 CPU / 4–16 GB / 1 GPU) |
+| Launchable / demo (AMP) | 4 CPU, 16 GB RAM, 1 GPU (CUDA 12, ~16 GB VRAM recommended), ~30 GB storage for wheels + dataset + checkpoint — per the AMP task profiles (2–4 CPU / 4–16 GB / 1 GPU) |
 | Off-GPU UI demo (compose) | 2 CPU, 4 GB RAM — DEMO-FALLBACK mode only, no live inference |
-| Production / enterprise | 16+ CPU, 64+ GB RAM, 1–2 NVIDIA A10G/L40S-class GPUs (24–48 GB VRAM) for concurrent inference and in-app training; Impala warehouse and VAST S3 sized to the transaction history retained |
+| Production / enterprise | 16+ CPU, 64+ GB RAM, 1–2 A10G/L40S-class GPUs (24–48 GB VRAM) for concurrent inference and in-app training; Impala warehouse and VAST S3 sized to the transaction history retained |
 
 ## Documentation
 

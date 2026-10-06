@@ -32,7 +32,7 @@
 - Heads: raw / embed / combined XGBoost, `device="cuda"`, early stopping 20 on val AUC.
 - Budget ladder: 4K/8K/12K/16K/20K rows per split at 35/55/75/90/100% rounds.
 - Metrics: held-out test **ROC-AUC** and **Average Precision**; lift % vs raw baseline.
-- Hardware: everything on one **24 GB NVIDIA L4**; registered endpoint runs 2 CPU/4 GB.
+- Hardware: everything on one **24 GB L4 GPU**; registered endpoint runs 2 CPU/4 GB.
 - Registry: model `tfm-fraud-combined`, experiment `tfm-fraud-demo`.
 
 ## Anticipated Q&A / objection handling
@@ -77,7 +77,7 @@ is not an H100 conversation.
 Optional scaffolding for a fourth benchmark card calling an external foundation model
 (Fundamental's Large Tabular Model) over a governed endpoint. Ships `off`/`stub` today;
 `docs/nexus-ltm-design.md` has the design and cost runbook. Use it to show the harness
-composes *any* FM, not just NVIDIA's.
+composes *any* FM, not just the TFM.
 
 ## Failure playbook
 

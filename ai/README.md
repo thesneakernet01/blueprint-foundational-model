@@ -9,7 +9,7 @@ itself lives in the root packages, not here (see
 A transaction is scored through five stages:
 
 1. **Tokenizer** — GPU-side (RAPIDS/cuDF) feature tokenization of the raw transaction.
-2. **TFM decoder** — NVIDIA's Transaction Foundation Model produces a 512-dimension
+2. **TFM decoder** — the Transaction Foundation Model produces a 512-dimension
    last-token embedding.
 3. **PCA-64** — the embedding is reduced to 64 dimensions.
 4. **Three XGBoost heads** — trained in parallel on raw features, on embeddings, and on

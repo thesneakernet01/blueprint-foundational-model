@@ -36,7 +36,7 @@ knows the demo will *prove* it with a live number, not a claim.
 
 - A decoder-only transformer (LLaMA-style architecture) that reads **transactions as
   tokens**, the way a language model reads words.
-- Pretrained by NVIDIA on payment sequences; this demo uses the public **IBM TabFormer**
+- Pretrained on payment sequences; this demo uses the public **TabFormer**
   dataset: **~24 million transactions across 20,000 simulated cardholders** (~2.4 GB).
 - Output: a dense **512-dimensional behavioral embedding** per transaction.
 - Remarkably small: the checkpoint is **~56 MB** — 8 transformer layers, hidden size
@@ -49,10 +49,10 @@ knows the demo will *prove* it with a live number, not a claim.
   6,251-token vocabulary; the decoder predicts what comes next in the sequence, and in
   doing so learns what "normal" looks like for a cardholder.
 - The ~56 MB size is a talking point, not a footnote: this is not a 70B-parameter LLM.
-  It fits comfortably on a single **NVIDIA L4 (24 GB)** alongside the whole training
+  It fits comfortably on a single **L4 GPU (24 GB)** alongside the whole training
   pipeline — foundation-model value at commodity-GPU cost.
 - Source anchor if asked: checkpoint fetched by `pipelines/fetch_model.py` from the
-  NVIDIA `transaction-foundation-model` blueprint repo; config in
+  upstream `transaction-foundation-model` blueprint repo; config in
   `models/decoder-foundation-model/config.json`.
 
 ---

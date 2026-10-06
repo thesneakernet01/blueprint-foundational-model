@@ -3,7 +3,7 @@
 A standalone React + TypeScript SPA for the Transaction Foundation Model live
 fraud-inference demo. It is a pure client: it calls the FastAPI backend
 (`../app.py`) over HTTP and renders the result. The backend is what runs the
-NVIDIA stack (GPU tokenizer → decoder checkpoint → embeddings → XGBoost heads),
+GPU stack (GPU tokenizer → decoder checkpoint → embeddings → XGBoost heads),
 so this app does no model work itself.
 
 ```
@@ -13,7 +13,7 @@ so this app does no model work itself.
 └────────────────────────┘     JSON scores + UMAP      └──────────────────────────────┘
 ```
 
-Built on the shared Cloudera/NVIDIA dark design system
+Built on the shared Cloudera dark design system
 (`demo-design-template` — surface scale, indigo accent, status trio, Inter +
 JetBrains Mono).
 

@@ -2,11 +2,11 @@
 """Generate the TabFormer temporal splits and load them into storage.
 
 The dataset is in no git repo: NB01 downloads it (~2.4 GB transactions.tgz from
-IBM Box). NB01 splits it with cuDF over the full ~24M rows, which OOMs a single
+a public file share). NB01 splits it with cuDF over the full ~24M rows, which OOMs a single
 modest GPU — so we reproduce its logic here in plain, chunked pandas (CPU,
 bounded memory):
 
-  * download + extract card_transaction.v1.csv (same IBM Box source as NB01),
+  * download + extract card_transaction.v1.csv (same source as NB01),
   * temporal split by date cutoffs at 80% / 90% cumulative rows (NB01's rule),
   * stratified ~100K val_eval / test_eval subsets (NB01's eval workflow),
   * load the splits train / val_eval / test_eval into the configured storage
@@ -47,7 +47,7 @@ sys.path.insert(0, str(_ROOT))
 from tfm_demo.config import DATA_DIR  # noqa: E402
 from tfm_demo import storage  # noqa: E402
 
-# Same shared file NB01 pulls from IBM Box.
+# Same shared TabFormer file NB01 downloads.
 DOWNLOAD_URL = (
     "https://ibm.ent.box.com/index.php"
     "?rm=box_download_shared_file"
@@ -78,7 +78,7 @@ def _download() -> None:
     if not CSV_PATH.exists():
         if not TGZ_PATH.exists():
             last = None
-            for attempt in range(1, 4):                   # IBM Box can be flaky
+            for attempt in range(1, 4):                   # the file share can be flaky
                 try:
                     print(f"prepare_data: downloading transactions.tgz (attempt {attempt}) ...")
                     urllib.request.urlretrieve(DOWNLOAD_URL, TGZ_PATH)
@@ -89,13 +89,13 @@ def _download() -> None:
                     TGZ_PATH.unlink(missing_ok=True)
             else:
                 raise RuntimeError(f"prepare_data: download failed after 3 tries: {last}")
-        # IBM Box sometimes serves an HTML error page instead of the gzip.
+        # The file share sometimes serves an HTML error page instead of the gzip.
         with open(TGZ_PATH, "rb") as fh:
             if fh.read(2) != b"\x1f\x8b":
                 TGZ_PATH.unlink(missing_ok=True)
                 raise RuntimeError(
-                    "prepare_data: downloaded file is not a gzip (IBM Box likely "
-                    "returned an error page). Retry, or download transactions.tgz "
+                    "prepare_data: downloaded file is not a gzip (the file share "
+                    "likely returned an error page). Retry, or download transactions.tgz "
                     f"manually into {SCRATCH}."
                 )
         print("prepare_data: extracting transactions.tgz ...")

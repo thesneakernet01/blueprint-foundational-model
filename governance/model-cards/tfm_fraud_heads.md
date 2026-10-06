@@ -3,10 +3,10 @@
 - **Accelerator:** `cloudera-forge-fsi-foundational-model`
 - **Serving:** in-process on one GPU container (`tfm_demo/engine.py`), REAL mode with the
   fetched checkpoint or DEMO-FALLBACK without it
-- **Components:** NVIDIA **Transaction Foundation Model** decoder (fetched by
+- **Components:** **Transaction Foundation Model** decoder (fetched by
   `pipelines/fetch_model.py`) → 512-d embeddings → PCA-64 → three **XGBoost** heads
   (raw features / embeddings / combined) · optional **NEXUS LTM** head
-- **NIM model ID:** _n/a (checkpoint-based)_ — pin the TFM checkpoint version here.
+- **Model ID:** _n/a (checkpoint-based)_ — pin the TFM checkpoint version here.
 
 ## Intended use
 
@@ -16,7 +16,8 @@ transaction data — not a production fraud decision system.
 
 ## Training / source data
 
-- TFM: pretrained by NVIDIA (consumed as a checkpoint).
+- TFM: pretrained upstream (consumed as a checkpoint); this demo uses the TabFormer
+  credit-card dataset.
 - Heads: trained in-app on the prepared transaction splits
   (`pipelines/prepare_data.py` → VAST/Impala).
 - PCA-64 fitted on the embedding set; artifacts under `models/` (gitignored).

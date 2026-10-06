@@ -1,7 +1,7 @@
 # Module 4 — Platform Architecture & Lab Preview (10 min)
 
 **Goal:** attendees know exactly what they'll click in the lab, and can generalize the
-Cloudera + NVIDIA pattern beyond fraud in customer conversations.
+Cloudera AI pattern beyond fraud in customer conversations.
 
 ---
 
@@ -10,13 +10,13 @@ Cloudera + NVIDIA pattern beyond fraud in customer conversations.
 **On the slide**
 
 - Ships as a **one-click Applied ML Prototype (AMP)**: `.project-metadata.yaml` declares
-  five tasks on an NVIDIA GPU runtime (JupyterLab / Python 3.12 / Nvidia GPU edition):
+  five tasks on a GPU runtime (JupyterLab / Python 3.12 / GPU edition):
 
 | # | Task | What it does |
 | --- | --- | --- |
 | 1 | `install_deps` | Pinned GPU-aware Python stack (RAPIDS cu12, torch cu121, transformers, XGBoost) |
 | 2 | `build_frontend` | User-local Node 20 + Vite build of the React SPA |
-| 3 | `fetch_model` | TFM checkpoint (~56 MB) + NVIDIA blueprint tokenizer package |
+| 3 | `fetch_model` | TFM checkpoint (~56 MB) + blueprint tokenizer package |
 | 4 | `prepare_data` | TabFormer → temporal splits → Impala / S3 Parquet |
 | 5 | `TFM Fraud Demo` | The application: FastAPI backend (private :7100) + SPA (public :8100) |
 
@@ -34,12 +34,12 @@ Cloudera + NVIDIA pattern beyond fraud in customer conversations.
 
 ---
 
-## Slide 4.2 — NVIDIA-enhanced performance on a single L4 (2 min)
+## Slide 4.2 — GPU-accelerated performance on a single L4 (2 min)
 
 **On the slide**
 
 - The full workload — embedding generation, PCA, 3× XGBoost training, cuML UMAP, and
-  live per-transaction inference — runs on **one NVIDIA L4 (24 GB)**.
+  live per-transaction inference — runs on **one L4 GPU (24 GB)**.
 - Engineering that makes it fit: RMM memory pool shared across libraries, cuDF spill to
   host, streaming one split at a time, batch-512 embedding, PyTorch expandable segments.
 - Sizing guidance: demo = 1× L4-class GPU; production = 1–2× A10G/L40S-class for

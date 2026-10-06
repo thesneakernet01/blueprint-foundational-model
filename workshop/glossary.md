@@ -1,10 +1,10 @@
 # Glossary — Transaction Foundation Models on Cloudera AI (handout)
 
-**Transaction Foundation Model (TFM)** — NVIDIA's decoder-only transformer (LLaMA-style,
+**Transaction Foundation Model (TFM)** — a decoder-only transformer (LLaMA-style,
 8 layers, hidden size 512, ~56 MB) pretrained on payment-transaction sequences. Reads
 transactions as tokens the way a language model reads words.
 
-**TabFormer** — IBM's public synthetic credit-card dataset used here: ~24 million
+**TabFormer** — the public synthetic credit-card dataset used here: ~24 million
 transactions across 20,000 simulated cardholders (~2.4 GB), with fraud labels.
 
 **Tokenization** — mapping raw transaction fields (amount, merchant, MCC, city, time,
@@ -42,13 +42,13 @@ next scored transaction uses the new model with zero service disruption.
 transactions appear as a dot placed by the same projection, next to a dashed ring
 showing the batch pipeline's position for that row (the consistency check).
 
-**RAPIDS** — NVIDIA's GPU data-science stack used throughout: **cuDF** (dataframes /
+**RAPIDS** — the GPU data-science stack used throughout: **cuDF** (dataframes /
 tokenizer input), **cuML** (UMAP), **RMM** (shared GPU memory pool), plus
-XGBoost-on-CUDA and PyTorch for the decoder. Sized to fit one 24 GB NVIDIA L4.
+XGBoost-on-CUDA and PyTorch for the decoder. Sized to fit one 24 GB L4 GPU.
 
 **AMP (Applied ML Prototype)** — Cloudera AI's one-click deployment: this app's
 `.project-metadata.yaml` declares five tasks (deps → SPA build → checkpoint fetch →
-data prep → application) on an NVIDIA GPU runtime.
+data prep → application) on a GPU runtime.
 
 **Cloudera AI Model Registry** — platform registry where the run is registered as
 `tfm-fraud-combined` (MLflow experiment `tfm-fraud-demo` carries params/metrics

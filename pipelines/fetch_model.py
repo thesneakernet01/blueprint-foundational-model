@@ -6,7 +6,7 @@
     which config.py already puts on sys.path. A standalone CML project has
     neither; without src/ the export dies with "No module named src".
 
-Both live in the NVIDIA TFM blueprint repo, the weights tracked with Git LFS
+Both live in the upstream TFM blueprint repo, the weights tracked with Git LFS
 (~56 MB). Rather than require git/git-lfs in the CML runtime, we download the
 files over plain HTTPS:
   * regular files from raw.githubusercontent.com,

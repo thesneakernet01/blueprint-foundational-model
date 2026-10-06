@@ -4,7 +4,7 @@
 # --- Identity ---
 name: "Transaction Foundation Model — Live Fraud Inference"
 slug: "cloudera-forge-fsi-foundational-model"     # URL-safe repo / catalog identifier
-description: "Live fraud-inference cockpit for NVIDIA's Transaction Foundation Model on Cloudera AI: GPU tokenizer, TFM decoder embeddings, PCA-64, and three XGBoost heads with AUC/AP lift and UMAP views in a React SPA, backed by Impala and VAST S3."
+description: "Live fraud-inference cockpit for a Transaction Foundation Model on Cloudera AI, using the TabFormer credit-card dataset: GPU tokenizer, TFM decoder embeddings, PCA-64, and three XGBoost heads with AUC/AP lift and UMAP views in a React SPA, backed by Impala and VAST S3."
 reprise_link: ""                              # Public reprise link
 
 # --- Classification (website filters) ---
@@ -40,7 +40,7 @@ product_mapping:                              # Cloudera products used
   - Cloudera AI Model Registry
   - Impala (Cloudera Data Warehouse)
 model_dependencies:                           # Models, embeddings, or external AI services, if any. Comment out if none.
-  - NVIDIA Transaction Foundation Model (decoder checkpoint)
+  - Transaction Foundation Model (decoder checkpoint)
   - XGBoost fraud classifier heads (trained in-app)
   - NEXUS LTM endpoint (optional long-term-memory head)
 

@@ -13,11 +13,11 @@
 
   <!-- Sources -->
   <rect x="24" y="70" width="180" height="62" rx="10" fill="#ffffff" stroke="#c3ccd6" stroke-width="1.5"/>
-  <text x="114" y="96" text-anchor="middle" font-size="14" font-weight="600" fill="#232f3e">IBM TabFormer</text>
+  <text x="114" y="96" text-anchor="middle" font-size="14" font-weight="600" fill="#232f3e">TabFormer dataset</text>
   <text x="114" y="116" text-anchor="middle" font-size="13" fill="#5f6b7a">card transactions (~2.4 GB)</text>
 
   <rect x="24" y="152" width="180" height="62" rx="10" fill="#ffffff" stroke="#c3ccd6" stroke-width="1.5"/>
-  <text x="114" y="178" text-anchor="middle" font-size="14" font-weight="600" fill="#232f3e">NVIDIA TFM repo</text>
+  <text x="114" y="178" text-anchor="middle" font-size="14" font-weight="600" fill="#232f3e">Upstream TFM repo</text>
   <text x="114" y="198" text-anchor="middle" font-size="13" fill="#5f6b7a">decoder checkpoint + src/</text>
 
   <!-- Pipelines -->

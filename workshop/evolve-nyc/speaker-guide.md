@@ -15,7 +15,7 @@ Every sentence maps to a deliverable: live scoring → Lab Ex 1 · GPU retrain w
 real-time updates → Lab Ex 2 + slide 15 · diagnostics → Lab Ex 3 · REST endpoint →
 Lab Ex 4 + slide 16 · AML / credit risk / churn → slide 20.
 
-**Deck:** [`TFM-Workshop-EvolveNYC-200.pptx`](TFM-Workshop-EvolveNYC-200.pptx)
+**Deck:** `TFM-Workshop-EvolveNYC-200.pptx` (kept in the shared `power_point_cloudera` deck collection, not in this repo)
 **Audience:** business-technical — comfortable with concepts like "model", "API",
 "GPU", but not practitioners. Sophomore (200) level: they know *what* these things
 are; today they learn *how they fit together* and *why it matters commercially*.
@@ -67,7 +67,7 @@ demo, same Miro diagrams — the language is rewritten for a business-technical 
   current model on day one.
 - **S13 (governed data):** the model trains where the data already lives, governed —
   no CSV on a laptop. Train on the past, test on the future.
-- **S14 (one GPU):** the cost message: engineered for the NVIDIA L4 a team can
+- **S14 (one GPU):** the cost message: engineered for the L4 GPU a team can
   actually get approved, not an 80 GB flagship.
 - **S15 (instant updates):** two beats — no maintenance window, and a logged history
   that survives "prove the model got better."

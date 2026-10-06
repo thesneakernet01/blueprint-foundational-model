@@ -6,7 +6,7 @@
 
 The inference stack is built from two Python packages imported as top-level names:
 
-- `src/` — the NVIDIA blueprint package (tokenizer, decoder inference), **staged by
+- `src/` — the upstream TFM blueprint package (tokenizer, decoder inference), **staged by
   `pipelines/fetch_model.py`** which writes files to `<root>/src/...` and warns that
   without it the export "dies with 'No module named src'".
 - `tfm_demo/` — the backend package, imported by the root `app.py` entrypoint

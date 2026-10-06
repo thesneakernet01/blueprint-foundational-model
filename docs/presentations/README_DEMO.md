@@ -157,4 +157,4 @@ back on read; Parquet keeps the original names.
   disabled until Fundamental access lands — run `deploy/nexus_probe.py` and
   follow the day-one checklist in `docs/nexus-ltm-design.md`.
 
-Built on the NVIDIA AI Blueprint *Transaction Foundation Model* (Apache-2.0).
+Built on the upstream *Transaction Foundation Model* blueprint (Apache-2.0).

@@ -16,7 +16,7 @@
 | `nexus-ltm-design.md` | The NEXUS long-term-memory head design. |
 | `standalone-demo.html` | A self-contained single-file demo page (pre-SPA artifact). |
 | `architecture/` | ADRs for deviations from the standard stack. |
-| `presentations/` | README_DEMO, the FSI demo runbook, the VAST decks + brand toolkit, and the deck-builder manual (`AGENTS.md`). |
+| `presentations/` | README_DEMO and the FSI demo runbook (decks live in the shared `power_point_cloudera` collection). |
 
 ## Conventions
 

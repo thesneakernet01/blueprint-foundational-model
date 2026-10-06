@@ -4,7 +4,7 @@
 # Deploys ONE application (app/serve_app.py) that runs both halves of the
 # demo in a single GPU container — CML exposes one public port per application
 # and separate apps can't talk over localhost, so they must share a container:
-#   * FastAPI backend (NVIDIA TFM stack) — private on 127.0.0.1:$BACKEND_PORT
+#   * FastAPI backend (GPU TFM stack)    — private on 127.0.0.1:$BACKEND_PORT
 #   * Vite preview server (React SPA)    — public on CDSW_APP_PORT, proxying
 #                                          /api/* inward to the backend
 # The SPA therefore calls same-origin /api/* and needs no cross-origin config.
@@ -12,11 +12,11 @@
 
 name: Transaction Foundation Model — Live Fraud Inference
 description: >
-  Live fraud-inference demo for the NVIDIA Transaction Foundation Model blueprint.
+  Live fraud-inference demo for the Transaction Foundation Model on the TabFormer dataset.
   A transaction flows through the GPU tokenizer, the decoder foundation model
   (512-d last-token embedding), PCA-64, and three XGBoost heads (raw / embeddings
   / combined) to produce fraud probabilities, AUC/AP lift, and a live UMAP
-  position. The FastAPI backend runs the NVIDIA stack on a GPU; the React SPA is
+  position. The FastAPI backend runs the GPU stack; the React SPA is
   a pure client. Training/export of the artifacts is launched from the UI and
   runs on the backend. Boots in a clearly-labelled DEMO-FALLBACK mode when the
   checkpoint, artifacts, or GPU are unavailable.
@@ -39,7 +39,7 @@ environment_variables:
   SKIP_GPU_DEPS:
     default: ""
     description: >
-      Set to 1 to skip installing the NVIDIA/GPU Python stack (requirements-gpu
+      Set to 1 to skip installing the GPU Python stack (requirements-gpu
       .txt) and run web-layer only — the engine then serves DEMO-FALLBACK mode.
       Leave empty for REAL mode on a GPU runtime.
     required: false
@@ -73,9 +73,9 @@ environment_variables:
     required: false
 
 # Recommended runtime. REAL mode needs CUDA + RAPIDS (cudf/cuml) + torch, so a
-# GPU runtime that contains the NVIDIA TFM stack (e.g. the NeMo container
-# registered as a custom ML Runtime) is required for live inference; the stock
-# Nvidia GPU edition below is the closest catalog default.
+# GPU runtime that contains the TFM stack (registered as a custom ML Runtime)
+# is required for live inference; the stock GPU edition below is the closest
+# catalog default.
 #
 # NO SPARK: this demo is GPU/RAPIDS only and must not provision Spark. CML
 # enables Spark solely by attaching a Spark runtime add-on to a task (an
@@ -95,7 +95,7 @@ tasks:
     entity_label: install_deps
     script: deploy/install_deps.py
     arguments: None
-    short_summary: Install the web layer + the NVIDIA/GPU Python stack (CUDA assumed present).
+    short_summary: Install the web layer + the GPU Python stack (CUDA assumed present).
     kernel: Python 3.12
     cpu: 2
     memory: 16
@@ -127,7 +127,7 @@ tasks:
 
   # --- fetch the checkpoint (Git LFS blob, ~56 MB) + the blueprint's src/ -----
   # fetch_model.py downloads models/decoder-foundation-model AND the blueprint's
-  # src/ package (tokenizer, decoder inference) from the NVIDIA TFM repo over
+  # src/ package (tokenizer, decoder inference) from the upstream TFM repo over
   # plain HTTPS (no git/git-lfs needed). REAL mode + in-app embedding generation
   # require both — a standalone CML project has neither, and without src/ the
   # export fails with "No module named src". No GPU; stdlib only.
@@ -147,8 +147,8 @@ tasks:
     short_summary: Run the checkpoint download.
 
   # --- prepare data: download TabFormer + load the splits into Impala --------
-  # The dataset isn't in any git repo; prepare_data.py downloads ~2.4 GB from
-  # IBM Box, reproduces NB01's temporal split in chunked pandas (bounded
+  # The dataset isn't in any git repo; prepare_data.py downloads ~2.4 GB,
+  # reproduces NB01's temporal split in chunked pandas (bounded
   # memory), and loads the splits into the configured Impala database. The
   # Impala connection/database are entered in the app's Data dialog (or the
   # IMPALA_* env vars) — when unset this job prints guidance and exits 0, and

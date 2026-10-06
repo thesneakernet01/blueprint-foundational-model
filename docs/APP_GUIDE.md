@@ -1,7 +1,8 @@
 # Transaction Foundation Model — Live Fraud Inference Cockpit
 
 A single-screen demo app for **Cloudera AI (CML)** that runs live fraud inference
-against the real NVIDIA **Transaction Foundation Model (TFM)** checkpoint. You
+against a real **Transaction Foundation Model (TFM)** checkpoint, using the
+TabFormer credit-card dataset. You
 compose (or load) a card transaction and watch it flow through the actual
 blueprint pipeline:
 
@@ -18,22 +19,22 @@ from raw transaction sequences." An optional fourth head (**NEXUS**,
 Fundamental's Large Tabular Model) extends the story to
 "classic GBM vs. TFM embeddings vs. Large Tabular Model."
 
-- **Backend:** FastAPI (`tfm_demo/`), runs the NVIDIA GPU stack in-process.
+- **Backend:** FastAPI (`tfm_demo/`), runs the GPU stack in-process.
 - **Frontend:** React/Vite SPA (`frontend/`), pure client, calls same-origin `/api/*`.
 - **Deployment shape on CML:** one Application, one GPU container —
   `app/serve_app.py` supervises uvicorn (private on `127.0.0.1:$BACKEND_PORT`)
   and a Vite preview server (public on `$CDSW_APP_PORT`) that proxies `/api/*` inward.
 
-Companion docs: [`README_DEMO.md`](README_DEMO.md) (modes, storage backends,
-customising), [`docs/demo-runbook-fsi.md`](docs/demo-runbook-fsi.md) (presenter
-run-of-show and talk tracks), [`docs/nexus-ltm-design.md`](docs/nexus-ltm-design.md)
+Companion docs: [`README_DEMO.md`](presentations/README_DEMO.md) (modes, storage backends,
+customising), [`docs/presentations/demo-runbook-fsi.md`](presentations/demo-runbook-fsi.md) (presenter
+run-of-show and talk tracks), [`docs/nexus-ltm-design.md`](nexus-ltm-design.md)
 (NEXUS integration design).
 
 ---
 
 ## Deploying on Cloudera AI
 
-The repo is a CML **AMP** — [`.project-metadata.yaml`](.project-metadata.yaml)
+The repo is a CML **AMP** — [`.project-metadata.yaml`](../.project-metadata.yaml)
 declares the whole deployment.
 
 ### Prerequisites
@@ -42,7 +43,7 @@ declares the whole deployment.
   checkpoint is small (~56 MB) and `tfm_demo/gpu.py` configures an RMM pool +
   cuDF spill so the export fits (the upstream blueprint assumes an 80 GB
   A100/H100; this app does not).
-- A **Python 3.12 / Nvidia GPU edition** ML Runtime (JupyterLab editor). CUDA
+- A **Python 3.12 GPU edition** ML Runtime (JupyterLab editor). CUDA
   must be present in the runtime; the setup job installs only Python wheels.
 - **No Spark.** The AMP intentionally declares no runtime add-ons — don't
   attach one.
@@ -64,7 +65,7 @@ The AMP runs four one-shot Jobs, then starts the Application:
 | Install dependencies | `deploy/install_deps.py` | `requirements-demo.txt` (web layer) + `requirements-gpu.txt` (RAPIDS cu12, torch cu121, transformers, xgboost — carefully pinned, see below). Slow: multi-GB wheels. |
 | Build frontend SPA | `deploy/build_frontend.py` | Installs Node user-locally (`~/.local/node`, no root) and runs `npm ci && npm run build` → `app/frontend/dist`. |
 | Fetch model checkpoint | `pipelines/fetch_model.py` | Downloads the decoder checkpoint into `models/` and the blueprint's `src/` package (tokenizer + inference code) over plain HTTPS — no git-lfs needed. |
-| Prepare TabFormer data | `pipelines/prepare_data.py` | Downloads TabFormer (~2.4 GB from IBM Box) and writes the temporal splits. **Exits 0 with guidance if storage isn't configured yet** — expected on a fresh deploy; you re-run it from the UI in step 3. |
+| Prepare TabFormer data | `pipelines/prepare_data.py` | Downloads TabFormer (~2.4 GB) and writes the temporal splits. **Exits 0 with guidance if storage isn't configured yet** — expected on a fresh deploy; you re-run it from the UI in step 3. |
 | **TFM Fraud Demo** (Application) | `app/serve_app.py` | Backend + UI in one GPU container; `bypass_authentication: true`, so the URL is publicly reachable. |
 
 ### 2. Open the app and configure storage
@@ -208,4 +209,4 @@ docs/                    # runbook, NEXUS design, Impala/VAST s3a notes
 docker*, docker-compose.yml  # off-GPU UI preview
 ```
 
-Built on the NVIDIA AI Blueprint *Transaction Foundation Model* (Apache-2.0).
+Built on the upstream *Transaction Foundation Model* blueprint (Apache-2.0).

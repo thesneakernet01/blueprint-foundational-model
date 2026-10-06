@@ -1,7 +1,7 @@
 # Hands-On Lab: Live Scoring, GPU Retraining & Endpoint Deployment (60 min)
 
 You are working with a live fraud-inference application running **natively on Cloudera
-AI**, with the full NVIDIA GPU stack behind it: cuDF tokenizer → TFM decoder (512-d
+AI**, with the full GPU stack behind it: cuDF tokenizer → TFM decoder (512-d
 embeddings) → PCA-64 → three XGBoost heads → cuML UMAP.
 
 **Your instance URL:** ______________________ (provided by the instructor)
@@ -247,6 +247,6 @@ one from `demo_artifacts/examples.json` in your project.)
 1. "Foundation-model embeddings gave a **measured double-digit AP lift** over
    hand-crafted features — here's the run history that proves it."
 2. "The whole loop — governed lakehouse data, GPU training, hot-reloaded scoring,
-   registry, governed endpoint — ran on **Cloudera AI with one NVIDIA L4**."
+   registry, governed endpoint — ran on **Cloudera AI with one L4 GPU**."
 3. "Swap the dataset and tokenizer, and this same harness benchmarks AML, credit risk,
    payments abuse, or churn."

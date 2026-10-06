@@ -1,9 +1,9 @@
-# SE Workshop: Transaction Foundation Models on Cloudera AI with NVIDIA GPU Acceleration
+# SE Workshop: Transaction Foundation Models on Cloudera AI with GPU Acceleration
 
 A 2-hour enablement workshop for technical Sales Engineers, built directly on this
 repository's live fraud-inference application. The narrative: **Cloudera AI is the
 unified platform** (governed data, in-app training, model registry, governed REST
-endpoints) and **NVIDIA GPUs are the compute engine** (tokenizer → TFM decoder →
+endpoints) and **GPUs are the compute engine** (tokenizer → TFM decoder →
 RAPIDS/cuDF → XGBoost-on-CUDA → cuML UMAP, all on a single commodity L4).
 
 > **Audience variants:** this Part 1 deck is pitched at technical SEs (300-level).

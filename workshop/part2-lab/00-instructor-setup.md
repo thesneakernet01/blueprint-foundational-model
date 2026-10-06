@@ -9,11 +9,11 @@ mode with data already loaded. **Do not** make attendees run `prepare_data` live
 
 Per attendee instance (or one shared instance for a guided lab):
 
-- Cloudera AI (CML) workspace with an **NVIDIA GPU ML Runtime** (JupyterLab /
-  Python 3.12 / Nvidia GPU edition, CUDA 12 driver). L4-class (24 GB) or better.
+- Cloudera AI (CML) workspace with a **GPU ML Runtime** (JupyterLab /
+  Python 3.12 / GPU edition, CUDA 12 driver). L4-class (24 GB) or better.
 - Impala virtual warehouse reachable from the workspace **or** S3-compatible object
   storage (VAST/MinIO) credentials.
-- Outbound HTTPS (TFM checkpoint from GitHub; TabFormer from IBM Box).
+- Outbound HTTPS (TFM checkpoint from GitHub; TabFormer dataset download).
 
 Deploy the repo as an AMP — the five tasks in `.project-metadata.yaml` run in order:
 `install_deps` → `build_frontend` → `fetch_model` → `prepare_data` → application

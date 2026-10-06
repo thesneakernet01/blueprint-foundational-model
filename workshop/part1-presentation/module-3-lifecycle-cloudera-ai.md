@@ -34,7 +34,7 @@ endpoint — and name the Cloudera component that owns each step.
 
 ---
 
-## Slide 3.2 — NVIDIA GPU pipeline execution (4 min)
+## Slide 3.2 — GPU pipeline execution (4 min)
 
 **On the slide**
 
@@ -49,7 +49,7 @@ check → embed → pca → train → (nexus) → artifacts        [then: reload
 - **train** — three XGBoost heads with `device="cuda"` (GPU hist tree method)
 - **artifacts** — plus **cuML UMAP** fits a 2-D projection of up to 8,000 test
   embeddings for the live map
-- Fits a **24 GB NVIDIA L4** by design: RMM pool allocator (1 GiB, growable), cuDF
+- Fits a **24 GB L4 GPU** by design: RMM pool allocator (1 GiB, growable), cuDF
   spilling enabled, PyTorch expandable segments, one-split-at-a-time streaming.
 
 **Speaker notes**
@@ -62,7 +62,7 @@ check → embed → pca → train → (nexus) → artifacts        [then: reload
   **torch cu121** (decoder). All pinned in `requirements-gpu.txt`.
 - Live proof point in the lab: the export dialog shows real GPU utilization/VRAM meters
   from `nvidia-smi` while the run executes.
-- War story if asked about robustness: the stack routes numba through NVIDIA's CUDA
+- War story if asked about robustness: the stack routes numba through the CUDA Python
   bindings and runs a "host-copy canary" subprocess before every export so a driver
   incompatibility fails with a readable error instead of crashing the server.
 

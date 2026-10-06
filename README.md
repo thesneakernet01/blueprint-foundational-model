@@ -105,7 +105,19 @@ The authoritative build/run guide is [`docs/APP_GUIDE.md`](docs/APP_GUIDE.md).
 
 ## Architecture / Software Components
 
-The `prepare_data.py` pipeline downloads the TabFormer credit-card dataset
+**Target architecture on Cloudera.** Card transactions are embedded by a transaction foundation model, XGBoost heads score fraud, and the best model is registered and served.
+
+- **Cloudera DataFlow (NiFi)** — lands card-transaction history (with fraud labels), live authorizations and merchant reference data.
+- **Open data lakehouse** — Iceberg tables and Parquet on VAST S3 hold the transaction history.
+- **Cloudera Data Warehouse (Impala)** — serves the temporal train / validation / test split tables the app trains and evaluates on.
+- **Cloudera AI Jobs (GPU)** — tokenize transactions with cuDF and run the TFM decoder to produce 512-dimension embeddings in batch.
+- **Cloudera AI Application** — the GPU fraud cockpit: tokenize and embed a transaction, score it with PCA-64 and the XGBoost heads, compare lift (AUC, AP, UMAP), and launch training and export.
+- **Cloudera AI Model Registry and endpoint** — each run is logged to the MLflow experiment `tfm-fraud-demo`; the combined head is registered as `tfm-fraud-combined` and deployed as a governed CPU REST endpoint.
+- **SDX** — Ranger controls access to card and account data; Atlas carries lineage from the data to each model version, with audit.
+
+![Target architecture on Cloudera](assets/architecture.svg)
+
+**How the demo runs today.** The `prepare_data.py` pipeline downloads the TabFormer credit-card dataset
 (~2.4 GB), reproduces the temporal train / val / test split, and loads it into Impala
 tables with Parquet artifacts on VAST S3; `fetch_model.py` downloads the TFM
 decoder checkpoint and the blueprint's `src/` tokenizer package. A single Cloudera AI
@@ -117,8 +129,6 @@ React SPA on `$CDSW_APP_PORT` and proxies `/api/*` inward. Training/export jobs 
 from the UI and run on the backend GPU; trained heads can be registered to the Cloudera
 AI model registry, and an optional NEXUS long-term-memory head calls an external
 endpoint.
-
-![Architecture](assets/architecture.svg)
 
 ## Target Audience
 

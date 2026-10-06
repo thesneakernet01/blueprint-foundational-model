@@ -9,94 +9,102 @@
   </defs>
 
   <rect x="0" y="0" width="960" height="540" fill="#fafbfc"/>
-  <text x="480" y="34" text-anchor="middle" font-size="20" font-weight="700" fill="#232f3e">Transaction Foundation Model — Live Fraud Inference</text>
+  <text x="480" y="28" text-anchor="middle" font-size="18" font-weight="700" fill="#232f3e">Transaction Foundation Model — Target Architecture on Cloudera</text>
+  <text x="480" y="47" text-anchor="middle" font-size="11" fill="#5f6b7a">Card transactions are embedded by a transaction foundation model, XGBoost heads score fraud, and the best model is registered and served</text>
 
   <!-- Sources -->
-  <rect x="24" y="70" width="180" height="62" rx="10" fill="#ffffff" stroke="#c3ccd6" stroke-width="1.5"/>
-  <text x="114" y="96" text-anchor="middle" font-size="14" font-weight="600" fill="#232f3e">TabFormer dataset</text>
-  <text x="114" y="116" text-anchor="middle" font-size="13" fill="#5f6b7a">card transactions (~2.4 GB)</text>
+  <text x="84" y="104" text-anchor="middle" font-size="10" font-weight="700" fill="#5f6b7a" letter-spacing="1">SOURCES</text>
+  <rect x="24" y="112" width="120" height="60" rx="8" fill="#ffffff" stroke="#8aa2b8"/>
+  <text x="84" y="137" text-anchor="middle" font-size="11" font-weight="600" fill="#232f3e">Card transactions</text>
+  <text x="84" y="154" text-anchor="middle" font-size="10" fill="#5f6b7a">history · fraud labels</text>
+  <rect x="24" y="186" width="120" height="60" rx="8" fill="#ffffff" stroke="#8aa2b8"/>
+  <text x="84" y="211" text-anchor="middle" font-size="11" font-weight="600" fill="#232f3e">Authorizations</text>
+  <text x="84" y="228" text-anchor="middle" font-size="10" fill="#5f6b7a">live scoring requests</text>
+  <rect x="24" y="260" width="120" height="60" rx="8" fill="#ffffff" stroke="#8aa2b8"/>
+  <text x="84" y="285" text-anchor="middle" font-size="11" font-weight="600" fill="#232f3e">Merchant data</text>
+  <text x="84" y="302" text-anchor="middle" font-size="10" fill="#5f6b7a">MCC · city · zip</text>
 
-  <rect x="24" y="152" width="180" height="62" rx="10" fill="#ffffff" stroke="#c3ccd6" stroke-width="1.5"/>
-  <text x="114" y="178" text-anchor="middle" font-size="14" font-weight="600" fill="#232f3e">Upstream TFM repo</text>
-  <text x="114" y="198" text-anchor="middle" font-size="13" fill="#5f6b7a">decoder checkpoint + src/</text>
+  <polyline points="144,142 152,142 152,290 144,290" fill="none" stroke="#5f6b7a" stroke-width="1.4"/>
+  <line x1="144" y1="216" x2="152" y2="216" stroke="#5f6b7a" stroke-width="1.4"/>
+  <line x1="152" y1="149" x2="172" y2="149" stroke="#5f6b7a" stroke-width="1.6" marker-end="url(#arrow)"/>
 
-  <!-- Pipelines -->
-  <rect x="252" y="70" width="184" height="62" rx="10" fill="#eef3f8" stroke="#8aa2b8" stroke-width="1.5"/>
-  <text x="344" y="96" text-anchor="middle" font-size="14" font-weight="600" fill="#232f3e">prepare_data.py</text>
-  <text x="344" y="116" text-anchor="middle" font-size="13" fill="#5f6b7a">temporal train/val/test split</text>
+  <!-- Platform container -->
+  <rect x="160" y="62" width="776" height="338" rx="14" fill="#ffffff" stroke="#f96702" stroke-width="2"/>
+  <text x="176" y="84" text-anchor="start" font-size="14" font-weight="700" fill="#f96702">Cloudera Data Platform — on-prem or public cloud (GPU nodes)</text>
+  <text x="176" y="104" font-size="10" font-weight="700" fill="#5f6b7a" letter-spacing="1">DATA PIPELINE — LANDS, SPLITS AND EMBEDS TRANSACTION HISTORY</text>
 
-  <rect x="252" y="152" width="184" height="62" rx="10" fill="#eef3f8" stroke="#8aa2b8" stroke-width="1.5"/>
-  <text x="344" y="178" text-anchor="middle" font-size="14" font-weight="600" fill="#232f3e">fetch_model.py</text>
-  <text x="344" y="198" text-anchor="middle" font-size="13" fill="#5f6b7a">checkpoint → models/</text>
+  <rect x="176" y="112" width="174" height="74" rx="8" fill="#eef3f8" stroke="#8aa2b8"/>
+  <text x="263" y="134" text-anchor="middle" font-size="11" font-weight="700" fill="#232f3e">Cloudera DataFlow · NiFi</text>
+  <text x="263" y="152" text-anchor="middle" font-size="10" fill="#5f6b7a">lands transaction history</text>
+  <text x="263" y="168" text-anchor="middle" font-size="10" fill="#5f6b7a">+ live authorization events</text>
 
-  <line x1="204" y1="101" x2="248" y2="101" stroke="#5f6b7a" stroke-width="1.8" marker-end="url(#arrow)"/>
-  <line x1="204" y1="183" x2="248" y2="183" stroke="#5f6b7a" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <rect x="366" y="112" width="174" height="74" rx="8" fill="#eef3f8" stroke="#8aa2b8"/>
+  <text x="453" y="134" text-anchor="middle" font-size="11" font-weight="700" fill="#232f3e">Open Data Lakehouse</text>
+  <text x="453" y="152" text-anchor="middle" font-size="10" fill="#5f6b7a">Iceberg · Parquet on VAST S3</text>
+  <text x="453" y="168" text-anchor="middle" font-size="10" fill="#5f6b7a">history + fraud labels</text>
 
-  <!-- Data layer -->
-  <rect x="484" y="62" width="452" height="80" rx="12" fill="#ffffff" stroke="#8aa2b8" stroke-width="1.5"/>
-  <text x="710" y="86" text-anchor="middle" font-size="14" font-weight="700" fill="#232f3e">Lakehouse data layer</text>
-  <rect x="500" y="98" width="200" height="34" rx="8" fill="#eef3f8" stroke="#8aa2b8"/>
-  <text x="600" y="120" text-anchor="middle" font-size="13" fill="#232f3e">Impala tables (splits)</text>
-  <rect x="720" y="98" width="200" height="34" rx="8" fill="#eef3f8" stroke="#8aa2b8"/>
-  <text x="820" y="120" text-anchor="middle" font-size="13" fill="#232f3e">VAST S3 (Parquet)</text>
-  <line x1="436" y1="101" x2="480" y2="101" stroke="#5f6b7a" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <rect x="556" y="112" width="174" height="74" rx="8" fill="#eef3f8" stroke="#8aa2b8"/>
+  <text x="643" y="134" text-anchor="middle" font-size="11" font-weight="700" fill="#232f3e">Cloudera Data Warehouse</text>
+  <text x="643" y="152" text-anchor="middle" font-size="10" fill="#5f6b7a">Impala temporal split tables</text>
+  <text x="643" y="168" text-anchor="middle" font-size="10" fill="#5f6b7a">train · val · test</text>
 
-  <!-- Cloudera AI container -->
-  <rect x="24" y="248" width="912" height="268" rx="14" fill="#ffffff" stroke="#f96702" stroke-width="2"/>
-  <text x="44" y="276" font-size="15" font-weight="700" fill="#f96702">Cloudera AI — single GPU application container (AMP)</text>
+  <rect x="746" y="112" width="174" height="74" rx="8" fill="#eef3f8" stroke="#8aa2b8"/>
+  <text x="833" y="134" text-anchor="middle" font-size="11" font-weight="700" fill="#232f3e">Cloudera AI Jobs (GPU)</text>
+  <text x="833" y="152" text-anchor="middle" font-size="10" fill="#5f6b7a">cuDF tokenize · TFM embed</text>
+  <text x="833" y="168" text-anchor="middle" font-size="10" fill="#5f6b7a">batch 512-d embeddings</text>
 
-  <!-- Engine group -->
-  <rect x="44" y="292" width="612" height="130" rx="10" fill="#fdf3ec" stroke="#e0b394" stroke-width="1.5"/>
-  <text x="350" y="314" text-anchor="middle" font-size="14" font-weight="600" fill="#232f3e">Inference engine (tfm_demo + src, RAPIDS / torch)</text>
+  <line x1="350" y1="149" x2="362" y2="149" stroke="#5f6b7a" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <line x1="540" y1="149" x2="552" y2="149" stroke="#5f6b7a" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <line x1="730" y1="149" x2="742" y2="149" stroke="#5f6b7a" stroke-width="1.6" marker-end="url(#arrow)"/>
 
-  <rect x="58" y="330" width="128" height="52" rx="8" fill="#ffffff" stroke="#c3ccd6" stroke-width="1.5"/>
-  <text x="122" y="352" text-anchor="middle" font-size="13" font-weight="600" fill="#232f3e">GPU tokenizer</text>
-  <text x="122" y="370" text-anchor="middle" font-size="13" fill="#5f6b7a">cuDF</text>
+  <!-- AI row -->
+  <rect x="176" y="226" width="500" height="96" rx="10" fill="#fdf3ec" stroke="#e0b394" stroke-width="1.5"/>
+  <text x="190" y="246" text-anchor="start" font-size="12" font-weight="700" fill="#232f3e">Cloudera AI — Fraud Cockpit (GPU Application)</text>
 
-  <rect x="210" y="330" width="140" height="52" rx="8" fill="#ffffff" stroke="#c3ccd6" stroke-width="1.5"/>
-  <text x="280" y="352" text-anchor="middle" font-size="13" font-weight="600" fill="#232f3e">TFM decoder</text>
-  <text x="280" y="370" text-anchor="middle" font-size="13" fill="#5f6b7a">512-d embedding</text>
+  <rect x="188" y="258" width="112" height="52" rx="7" fill="#ffffff" stroke="#e0b394"/>
+  <text x="244" y="278" text-anchor="middle" font-size="11" font-weight="600" fill="#232f3e">Tokenize · embed</text>
+  <text x="244" y="295" text-anchor="middle" font-size="10" fill="#5f6b7a">TFM decoder</text>
+  <rect x="310" y="258" width="112" height="52" rx="7" fill="#ffffff" stroke="#e0b394"/>
+  <text x="366" y="278" text-anchor="middle" font-size="11" font-weight="600" fill="#232f3e">Score</text>
+  <text x="366" y="295" text-anchor="middle" font-size="10" fill="#5f6b7a">PCA-64 · XGBoost</text>
+  <rect x="432" y="258" width="112" height="52" rx="7" fill="#ffffff" stroke="#e0b394"/>
+  <text x="488" y="278" text-anchor="middle" font-size="11" font-weight="600" fill="#232f3e">Compare lift</text>
+  <text x="488" y="295" text-anchor="middle" font-size="10" fill="#5f6b7a">AUC · AP · UMAP</text>
+  <rect x="554" y="258" width="112" height="52" rx="7" fill="#ffffff" stroke="#e0b394"/>
+  <text x="610" y="278" text-anchor="middle" font-size="11" font-weight="600" fill="#232f3e">Train · export</text>
+  <text x="610" y="295" text-anchor="middle" font-size="10" fill="#5f6b7a">in-app, on GPU</text>
+  <line x1="300" y1="284" x2="308" y2="284" stroke="#5f6b7a" stroke-width="1.4" marker-end="url(#arrow)"/>
+  <line x1="422" y1="284" x2="430" y2="284" stroke="#5f6b7a" stroke-width="1.4" marker-end="url(#arrow)"/>
+  <line x1="544" y1="284" x2="552" y2="284" stroke="#5f6b7a" stroke-width="1.4" marker-end="url(#arrow)"/>
 
-  <rect x="374" y="330" width="96" height="52" rx="8" fill="#ffffff" stroke="#c3ccd6" stroke-width="1.5"/>
-  <text x="422" y="360" text-anchor="middle" font-size="13" font-weight="600" fill="#232f3e">PCA-64</text>
+  <rect x="700" y="226" width="220" height="96" rx="10" fill="#eef3f8" stroke="#8aa2b8"/>
+  <text x="810" y="248" text-anchor="middle" font-size="12" font-weight="700" fill="#232f3e">Cloudera AI Registry · Endpoint</text>
+  <text x="810" y="266" text-anchor="middle" font-size="10" fill="#5f6b7a">MLflow experiment tfm-fraud-demo</text>
+  <text x="810" y="282" text-anchor="middle" font-size="10" fill="#5f6b7a">registered: tfm-fraud-combined</text>
+  <text x="810" y="298" text-anchor="middle" font-size="10" fill="#5f6b7a">governed CPU REST endpoint</text>
+  <line x1="676" y1="274" x2="696" y2="274" stroke="#f96702" stroke-width="1.8" stroke-dasharray="5,3" marker-end="url(#arrowO)"/>
 
-  <rect x="494" y="330" width="148" height="52" rx="8" fill="#ffffff" stroke="#c3ccd6" stroke-width="1.5"/>
-  <text x="568" y="352" text-anchor="middle" font-size="13" font-weight="600" fill="#232f3e">3 XGBoost heads</text>
-  <text x="568" y="370" text-anchor="middle" font-size="13" fill="#5f6b7a">raw · embed · combined</text>
+  <!-- Between rows -->
+  <line x1="600" y1="186" x2="600" y2="222" stroke="#5f6b7a" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="588" y="209" text-anchor="end" font-size="10" fill="#5f6b7a">read splits</text>
+  <polyline points="660,226 660,206 790,206 790,190" fill="none" stroke="#f96702" stroke-width="1.8" stroke-dasharray="5,3" marker-end="url(#arrowO)"/>
+  <text x="676" y="200" text-anchor="start" font-size="10" fill="#f96702">launch export</text>
 
-  <line x1="186" y1="356" x2="206" y2="356" stroke="#f96702" stroke-width="1.8" marker-end="url(#arrowO)"/>
-  <line x1="350" y1="356" x2="370" y2="356" stroke="#f96702" stroke-width="1.8" marker-end="url(#arrowO)"/>
-  <line x1="470" y1="356" x2="490" y2="356" stroke="#f96702" stroke-width="1.8" marker-end="url(#arrowO)"/>
+  <!-- SDX -->
+  <rect x="176" y="346" width="744" height="40" rx="8" fill="#eef3f8" stroke="#8aa2b8"/>
+  <text x="610" y="370" text-anchor="middle" font-size="11" fill="#232f3e"><tspan font-weight="700">SDX</tspan> — Ranger: access to card and account data · Atlas: lineage from data to model version · audit</text>
+  <line x1="810" y1="322" x2="810" y2="342" stroke="#f96702" stroke-width="1.8" stroke-dasharray="5,3" marker-end="url(#arrowO)"/>
+  <text x="822" y="337" text-anchor="start" font-size="10" fill="#f96702">lineage</text>
 
-  <text x="350" y="408" text-anchor="middle" font-size="13" fill="#5f6b7a">in-app training/export · AUC/AP lift · UMAP · optional NEXUS LTM head</text>
+  <!-- Consumers -->
+  <rect x="176" y="440" width="240" height="52" rx="10" fill="#fdf3ec" stroke="#f96702" stroke-width="1.5"/>
+  <text x="296" y="462" text-anchor="middle" font-size="14" font-weight="600" fill="#232f3e">Analysts · data scientists</text>
+  <text x="296" y="480" text-anchor="middle" font-size="11" fill="#5f6b7a">compose transactions · compare lift</text>
+  <line x1="296" y1="438" x2="296" y2="326" stroke="#f96702" stroke-width="1.8" marker-end="url(#arrowO)"/>
 
-  <!-- Backend + SPA -->
-  <rect x="692" y="292" width="224" height="60" rx="10" fill="#eef3f8" stroke="#8aa2b8" stroke-width="1.5"/>
-  <text x="804" y="316" text-anchor="middle" font-size="14" font-weight="600" fill="#232f3e">FastAPI backend</text>
-  <text x="804" y="336" text-anchor="middle" font-size="13" fill="#5f6b7a">127.0.0.1:$BACKEND_PORT</text>
-
-  <rect x="692" y="376" width="224" height="60" rx="10" fill="#eef3f8" stroke="#8aa2b8" stroke-width="1.5"/>
-  <text x="804" y="400" text-anchor="middle" font-size="14" font-weight="600" fill="#232f3e">Vite preview + React SPA</text>
-  <text x="804" y="420" text-anchor="middle" font-size="13" fill="#5f6b7a">public $CDSW_APP_PORT</text>
-
-  <line x1="656" y1="356" x2="688" y2="330" stroke="#5f6b7a" stroke-width="1.8" marker-end="url(#arrow)"/>
-  <line x1="804" y1="372" x2="804" y2="356" stroke="#5f6b7a" stroke-width="1.8" marker-end="url(#arrow)"/>
-  <text x="812" y="368" font-size="12" fill="#5f6b7a">/api/* proxy</text>
-
-  <!-- Registry -->
-  <rect x="44" y="440" width="280" height="56" rx="10" fill="#ffffff" stroke="#c3ccd6" stroke-width="1.5"/>
-  <text x="184" y="464" text-anchor="middle" font-size="14" font-weight="600" fill="#232f3e">Cloudera AI model registry</text>
-  <text x="184" y="484" text-anchor="middle" font-size="13" fill="#5f6b7a">register / deploy trained heads</text>
-  <line x1="184" y1="422" x2="184" y2="436" stroke="#5f6b7a" stroke-width="1.8" marker-end="url(#arrow)"/>
-
-  <!-- Data feeds into engine -->
-  <line x1="600" y1="142" x2="420" y2="288" stroke="#5f6b7a" stroke-width="1.8" marker-end="url(#arrow)"/>
-  <text x="540" y="222" font-size="12" fill="#5f6b7a">training splits</text>
-  <line x1="344" y1="214" x2="344" y2="288" stroke="#5f6b7a" stroke-width="1.8" marker-end="url(#arrow)"/>
-  <text x="352" y="240" font-size="12" fill="#5f6b7a">checkpoint</text>
-
-  <!-- Browser -->
-  <rect x="692" y="452" width="224" height="44" rx="10" fill="#fdf3ec" stroke="#f96702" stroke-width="1.5"/>
-  <text x="804" y="480" text-anchor="middle" font-size="14" font-weight="600" fill="#232f3e">Analyst browser (cockpit)</text>
-  <line x1="804" y1="448" x2="804" y2="440" stroke="#f96702" stroke-width="1.8" marker-start="url(#arrowO)" marker-end="url(#arrowO)"/>
+  <!-- Footer -->
+  <rect x="440" y="436" width="496" height="62" rx="8" fill="#ffffff" stroke="#c3ccd6"/>
+  <text x="688" y="457" text-anchor="middle" font-size="11" fill="#5f6b7a">Demo today: TabFormer dataset · Impala split tables + Parquet on VAST S3</text>
+  <text x="688" y="473" text-anchor="middle" font-size="11" fill="#5f6b7a">one GPU app container (AMP) · optional NEXUS long-term-memory head</text>
+  <text x="688" y="489" text-anchor="middle" font-size="11" fill="#5f6b7a">Dashed orange = launch export · register and deploy · lineage</text>
 </svg>
